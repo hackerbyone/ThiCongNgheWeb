@@ -1,0 +1,143 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\CongNgheWeb\\VanPhongPham\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{9C747753-99CA-4281-BE7D-1711BA222237}|BaseCore.Repository\\BaseCore.Repository.csproj|d:\\congngheweb\\vanphongpham\\basecore.repository\\efcore\\productrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{9C747753-99CA-4281-BE7D-1711BA222237}|BaseCore.Repository\\BaseCore.Repository.csproj|solutionrelative:basecore.repository\\efcore\\productrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B1C2D3E4-F5A6-7890-BCDE-F12345678901}|BaseCore.APIService\\BaseCore.APIService.csproj|d:\\congngheweb\\vanphongpham\\basecore.apiservice\\controllers\\productscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B1C2D3E4-F5A6-7890-BCDE-F12345678901}|BaseCore.APIService\\BaseCore.APIService.csproj|solutionrelative:basecore.apiservice\\controllers\\productscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{3934463F-480E-4BE1-8796-E79F458CAEE7}|BaseCore.ApiGateway\\BaseCore.ApiGateway.csproj|d:\\congngheweb\\vanphongpham\\basecore.apigateway\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{3934463F-480E-4BE1-8796-E79F458CAEE7}|BaseCore.ApiGateway\\BaseCore.ApiGateway.csproj|solutionrelative:basecore.apigateway\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|d:\\congngheweb\\vanphongpham\\basecore.authservice\\controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|solutionrelative:basecore.authservice\\controllers\\usercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|d:\\congngheweb\\vanphongpham\\basecore.authservice\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|solutionrelative:basecore.authservice\\controllers\\authcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|d:\\congngheweb\\vanphongpham\\basecore.authservice\\controllers\\rolescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{FDA5D057-E608-4A17-B58B-FABEADC300D9}|BaseCore.AuthService\\BaseCore.AuthService.csproj|solutionrelative:basecore.authservice\\controllers\\rolescontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19540157-8E18-4C2D-A482-34832430B612}|BaseCore.Services\\BaseCore.Services.csproj|d:\\congngheweb\\vanphongpham\\basecore.services\\authen\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19540157-8E18-4C2D-A482-34832430B612}|BaseCore.Services\\BaseCore.Services.csproj|solutionrelative:basecore.services\\authen\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ProductRepository.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.Repository\\EFCore\\ProductRepository.cs",
+              "RelativeDocumentMoniker": "BaseCore.Repository\\EFCore\\ProductRepository.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.Repository\\EFCore\\ProductRepository.cs",
+              "RelativeToolTip": "BaseCore.Repository\\EFCore\\ProductRepository.cs",
+              "ViewState": "AgIAAEQAAAAAAAAAAAAswAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T03:00:17.105Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ProductsController.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.APIService\\Controllers\\ProductsController.cs",
+              "RelativeDocumentMoniker": "BaseCore.APIService\\Controllers\\ProductsController.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.APIService\\Controllers\\ProductsController.cs",
+              "RelativeToolTip": "BaseCore.APIService\\Controllers\\ProductsController.cs",
+              "ViewState": "AgIAAC0AAAAAAAAAAAAYwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:58:46.577Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.ApiGateway\\Program.cs",
+              "RelativeDocumentMoniker": "BaseCore.ApiGateway\\Program.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.ApiGateway\\Program.cs",
+              "RelativeToolTip": "BaseCore.ApiGateway\\Program.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAAAA4AAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:43:59.544Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "UserController.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\UserController.cs",
+              "RelativeDocumentMoniker": "BaseCore.AuthService\\Controllers\\UserController.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\UserController.cs",
+              "RelativeToolTip": "BaseCore.AuthService\\Controllers\\UserController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:32:55.284Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "RolesController.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\RolesController.cs",
+              "RelativeDocumentMoniker": "BaseCore.AuthService\\Controllers\\RolesController.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\RolesController.cs",
+              "RelativeToolTip": "BaseCore.AuthService\\Controllers\\RolesController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:28:47.973Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "AuthController.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\AuthController.cs",
+              "RelativeDocumentMoniker": "BaseCore.AuthService\\Controllers\\AuthController.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.AuthService\\Controllers\\AuthController.cs",
+              "RelativeToolTip": "BaseCore.AuthService\\Controllers\\AuthController.cs",
+              "ViewState": "AgIAADUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:02:27.013Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "UserService.cs",
+              "DocumentMoniker": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.Services\\Authen\\UserService.cs",
+              "RelativeDocumentMoniker": "BaseCore.Services\\Authen\\UserService.cs",
+              "ToolTip": "D:\\CongNgheWeb\\VanPhongPham\\BaseCore.Services\\Authen\\UserService.cs",
+              "RelativeToolTip": "BaseCore.Services\\Authen\\UserService.cs",
+              "ViewState": "AgIAACIAAAAAAAAAAAAcwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-17T02:01:19.162Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
