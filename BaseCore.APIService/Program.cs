@@ -249,6 +249,51 @@ using (var scope = app.Services.CreateScope())
             END
         ");
 
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (
+                SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Orders' AND COLUMN_NAME = 'ShippingFee'
+            )
+            BEGIN
+                ALTER TABLE [Orders] ADD [ShippingFee] decimal(18,2) NOT NULL DEFAULT 0;
+                PRINT 'Schema patch applied: ShippingFee added to Orders';
+            END
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (
+                SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Orders' AND COLUMN_NAME = 'PaymentMethod'
+            )
+            BEGIN
+                ALTER TABLE [Orders] ADD [PaymentMethod] nvarchar(50) NOT NULL DEFAULT N'COD';
+                PRINT 'Schema patch applied: PaymentMethod added to Orders';
+            END
+        ");
+
+        db.Database.ExecuteSqlRaw(@"
+            IF NOT EXISTS (SELECT 1 FROM sys.objects WHERE object_id = OBJECT_ID(N'[ProductReviews]') AND type = 'U')
+            BEGIN
+                CREATE TABLE [ProductReviews] (
+                    [Id]        int              NOT NULL IDENTITY,
+                    [ProductId] int              NOT NULL,
+                    [OrderId]   int              NOT NULL,
+                    [UserId]    uniqueidentifier NOT NULL,
+                    [Rating]    int              NOT NULL,
+                    [Comment]   nvarchar(1000)   NOT NULL DEFAULT N'',
+                    [CreatedAt] datetime2        NOT NULL DEFAULT GETDATE(),
+                    CONSTRAINT [PK_ProductReviews] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_ProductReviews_Products_ProductId]
+                        FOREIGN KEY ([ProductId]) REFERENCES [Products]([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_ProductReviews_Orders_OrderId]
+                        FOREIGN KEY ([OrderId]) REFERENCES [Orders]([Id]) ON DELETE CASCADE
+                );
+                CREATE UNIQUE INDEX [IX_ProductReviews_Order_Product_User]
+                    ON [ProductReviews]([OrderId], [ProductId], [UserId]);
+                PRINT 'Schema patch applied: ProductReviews table created';
+            END
+        ");
+
         Console.WriteLine("Database ready.");
     }
     catch (Exception ex)

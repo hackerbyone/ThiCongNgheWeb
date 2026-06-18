@@ -28,6 +28,7 @@ export default function ProductList() {
   const [appliedMin, setAppliedMin] = useState(null)
   const [appliedMax, setAppliedMax] = useState(null)
   const [sortOrder, setSortOrder] = useState('')
+  const [discountOnly, setDiscountOnly] = useState(false)
 
   useEffect(() => {
     categoryApi.getList()
@@ -57,6 +58,7 @@ export default function ProductList() {
     if (appliedMin !== null) params.minPrice = appliedMin
     if (appliedMax !== null) params.maxPrice = appliedMax
     if (sortOrder) params.sortBy = sortOrder
+    if (discountOnly) params.discountOnly = true
 
     productApi.getList(params)
       .then((res) => {
@@ -64,22 +66,29 @@ export default function ProductList() {
         setTotalPages(res?.totalPages || 1)
         setTotalCount(res?.totalCount || 0)
       })
-      .catch((err) => {
-        console.error(err)
+      .catch(() => {
         setProducts([])
         setTotalPages(1)
         setTotalCount(0)
       })
       .finally(() => setLoading(false))
-  }, [page, categoryId, keyword, appliedMin, appliedMax, sortOrder])
+  }, [page, categoryId, keyword, appliedMin, appliedMax, sortOrder, discountOnly])
 
-  function applyPrice() {
+  const handleSliderMin = (e) => {
+    setPriceMin(Math.min(+e.target.value, priceMax - STEP))
+  }
+
+  const handleSliderMax = (e) => {
+    setPriceMax(Math.max(+e.target.value, priceMin + STEP))
+  }
+
+  const applyPrice = () => {
     setAppliedMin(priceMin > 0 ? priceMin : null)
     setAppliedMax(priceMax < MAX_PRICE ? priceMax : null)
     setPage(1)
   }
 
-  function resetPrice() {
+  const resetPrice = () => {
     setPriceMin(0)
     setPriceMax(MAX_PRICE)
     setAppliedMin(null)
@@ -100,6 +109,23 @@ export default function ProductList() {
       <div className="flex flex-col md:flex-row gap-6">
         {/* Sidebar */}
         <aside className="w-full md:w-56 shrink-0 space-y-4">
+
+          {/* Hàng giảm giá */}
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => { setDiscountOnly(!discountOnly); setPage(1) }}
+              className={`w-full flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                discountOnly
+                  ? 'bg-red-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-red-50 hover:text-red-600'
+              }`}
+            >
+              <span className="text-base">🔥</span>
+              <span>Hàng đang giảm giá</span>
+              {discountOnly && <span className="ml-auto text-white text-xs">✓</span>}
+            </button>
+          </div>
+
           {/* Danh mục */}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <h3 className="bg-primary-700 text-white px-4 py-2.5 font-medium text-sm">
@@ -145,61 +171,43 @@ export default function ProductList() {
               )}
             </div>
             <div className="px-4 py-4">
-              {/* Dual range slider */}
-              <div className="relative h-5 mt-2 mb-4">
-                {/* Track nền */}
-                <div className="absolute top-1/2 left-0 right-0 h-1.5 bg-gray-200 rounded -translate-y-1/2" />
-                {/* Track active */}
-                <div
-                  className="absolute top-1/2 h-1.5 bg-primary-500 rounded -translate-y-1/2"
-                  style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
-                />
-                {/* Input min (transparent, bắt sự kiện kéo) */}
+              {/* Dual range slider — kéo thả để lọc */}
+              <div className="range-slider">
+                <div className="range-slider-track">
+                  <div
+                    className="range-slider-fill"
+                    style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
+                  />
+                </div>
                 <input
                   type="range"
                   min={0}
                   max={MAX_PRICE}
                   step={STEP}
                   value={priceMin}
-                  onChange={e => setPriceMin(Math.min(+e.target.value, priceMax - STEP))}
-                  className="absolute w-full h-full opacity-0 cursor-pointer"
-                  style={{ zIndex: priceMin > MAX_PRICE * 0.95 ? 5 : 3 }}
+                  onChange={handleSliderMin}
+                  onMouseUp={applyPrice}
+                  onTouchEnd={applyPrice}
+                  className="range-input"
+                  style={{ zIndex: minPercent >= maxPercent - 5 ? 5 : 3 }}
                 />
-                {/* Input max (transparent, bắt sự kiện kéo) */}
                 <input
                   type="range"
                   min={0}
                   max={MAX_PRICE}
                   step={STEP}
                   value={priceMax}
-                  onChange={e => setPriceMax(Math.max(+e.target.value, priceMin + STEP))}
-                  className="absolute w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleSliderMax}
+                  onMouseUp={applyPrice}
+                  onTouchEnd={applyPrice}
+                  className="range-input"
                   style={{ zIndex: 4 }}
                 />
-                {/* Thumb min (visual) */}
-                <div
-                  className="absolute top-1/2 w-4 h-4 bg-white border-2 border-primary-500 rounded-full -translate-y-1/2 -translate-x-1/2 pointer-events-none shadow"
-                  style={{ left: `${minPercent}%` }}
-                />
-                {/* Thumb max (visual) */}
-                <div
-                  className="absolute top-1/2 w-4 h-4 bg-white border-2 border-primary-500 rounded-full -translate-y-1/2 -translate-x-1/2 pointer-events-none shadow"
-                  style={{ left: `${maxPercent}%` }}
-                />
               </div>
-
-              {/* Giá trị min/max */}
-              <div className="flex justify-between text-xs text-gray-600 mb-3">
-                <span className="font-medium text-primary-700">{fmt(priceMin)}</span>
-                <span className="font-medium text-primary-700">{fmt(priceMax)}</span>
+              <div className="flex justify-between text-xs text-primary-700 font-medium mt-2">
+                <span>{fmt(priceMin)}</span>
+                <span>{fmt(priceMax)}</span>
               </div>
-
-              <button
-                onClick={applyPrice}
-                className="w-full bg-primary-500 hover:bg-primary-600 text-white text-sm py-1.5 rounded font-medium transition-colors"
-              >
-                Áp dụng
-              </button>
             </div>
           </div>
         </aside>
@@ -208,7 +216,9 @@ export default function ProductList() {
         <main className="flex-1">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-0.5">{title}</h1>
+              <h1 className="text-2xl font-bold text-gray-800 mb-0.5">
+                {discountOnly ? '🔥 Hàng đang giảm giá' : title}
+              </h1>
               <p className="text-sm text-gray-500">
                 {totalCount} sản phẩm
                 {isPriceFiltered && (
@@ -222,7 +232,7 @@ export default function ProductList() {
             {/* Sắp xếp */}
             <select
               value={sortOrder}
-              onChange={e => { setSortOrder(e.target.value); setPage(1) }}
+              onChange={(e) => { setSortOrder(e.target.value); setPage(1) }}
               className="border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-700 outline-none focus:border-primary-500 bg-white cursor-pointer"
             >
               <option value="">Sắp xếp: Mặc định</option>

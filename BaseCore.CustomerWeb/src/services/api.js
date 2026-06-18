@@ -22,10 +22,15 @@ export const productApi = {
   create: (data) => wrap(axiosClient.post('/products', data)),
   update: (id, data) => wrap(axiosClient.put(`/products/${id}`, data)),
   delete: (id) => wrap(axiosClient.delete(`/products/${id}`)),
+  updateDiscount: (id, discountPercent) => wrap(axiosClient.put(`/products/${id}/discount`, { discountPercent })),
+  getReviews: (id) => wrap(axiosClient.get(`/products/${id}/reviews`)),
+  createReview: (id, data) => wrap(axiosClient.post(`/products/${id}/reviews`, data)),
   uploadImage: (id, file) => {
     const fd = new FormData()
     fd.append('image', file)
-    return wrap(axiosClient.post(`/products/${id}/image`, fd))
+    return wrap(axiosClient.post(`/products/${id}/image`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }))
   },
 }
 
@@ -60,6 +65,7 @@ export const orderApi = {
   reject: (id, reason) => wrap(axiosClient.put(`/orders/${id}/reject`, { reason })),
   updateStatus: (id, status) => wrap(axiosClient.put(`/orders/${id}/status`, { status })),
   cancel: (id) => wrap(axiosClient.put(`/orders/${id}/cancel`)),
+  markReceived: (id) => wrap(axiosClient.put(`/orders/${id}/received`)),
 }
 
 export const warehouseApi = {

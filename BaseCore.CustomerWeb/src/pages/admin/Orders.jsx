@@ -14,7 +14,7 @@ ChartJS.register(
 
 const statusConfig = {
     Pending:    { label: 'Chờ duyệt',   badge: 'warning',   color: '#ffc107' },
-    Processing: { label: 'Đang xử lý',  badge: 'info',      color: '#17a2b8' },
+    Processing: { label: 'Đang vận chuyển',  badge: 'info',      color: '#17a2b8' },
     Completed:  { label: 'Hoàn thành',  badge: 'success',   color: '#28a745' },
     Cancelled:  { label: 'Đã hủy',      badge: 'secondary', color: '#6c757d' },
     Rejected:   { label: 'Từ chối',     badge: 'danger',    color: '#dc3545' },
@@ -28,6 +28,158 @@ const getDefaultDateRange = () => {
         startDate: start.toISOString().split('T')[0],
         endDate: end.toISOString().split('T')[0],
     };
+};
+
+const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n || 0);
+const fmtCur = (n) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0);
+
+const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const downloadBlob = (content, filename, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+const exportOrderReportDoc = ({ revenueSummary, warehouseReport, startDate, endDate, periodOrders, periodRevenue }) => {
+    const statusSummary = revenueSummary?.statusSummary || {};
+    const whSummary = warehouseReport?.summary || {};
+    const details = warehouseReport?.details || [];
+    const period = `${startDate || 'Tất cả'} đến ${endDate || 'Tất cả'}`;
+    const exportDate = new Date().toLocaleString('vi-VN');
+    const statusRows = ['Pending', 'Processing', 'Completed', 'Cancelled', 'Rejected'].map(key => {
+        const cfg = statusConfig[key];
+        const value = statusSummary[key.charAt(0).toLowerCase() + key.slice(1)] ?? 0;
+        const percent = periodOrders > 0 ? ((value / periodOrders) * 100).toFixed(1) : '0.0';
+        return `
+            <tr>
+                <td><span class="status-dot" style="background:${cfg.color}"></span>${escapeHtml(cfg.label)}</td>
+                <td class="center">${fmt(value)}</td>
+                <td class="right">${percent}%</td>
+            </tr>
+        `;
+    }).join('');
+
+    const detailRows = details.length
+        ? details.map((d, index) => `
+            <tr>
+                <td class="center">${index + 1}</td>
+                <td class="product">${escapeHtml(d.productName)}</td>
+                <td>${escapeHtml(d.categoryName)}</td>
+                <td class="center">${fmt(d.currentStock)}</td>
+                <td class="center">${fmt(d.quantitySold)}</td>
+                <td class="money">${fmtCur(d.revenue)}</td>
+                <td class="center">${fmt(d.quantityReceived)}</td>
+                <td class="center danger">${fmt(d.quantityDamaged)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="8" class="empty">Không có dữ liệu sản phẩm trong khoảng thời gian này</td></tr>';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Báo cáo doanh thu đơn hàng</title>
+    <style>
+        @page { size: A4 landscape; margin: 1.2cm; }
+        body { font-family: Arial, sans-serif; color: #1f2937; font-size: 11pt; }
+        .header { border-bottom: 3px solid #166534; padding-bottom: 10px; margin-bottom: 16px; }
+        .company { color: #64748b; font-size: 10pt; text-transform: uppercase; letter-spacing: 1px; }
+        h1 { color: #166534; font-size: 22pt; margin: 4px 0; text-align: center; }
+        h2 { color: #166534; font-size: 14pt; margin: 16px 0 8px; }
+        .meta { text-align: center; color: #475569; margin-bottom: 14px; }
+        .summary { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 12px 0 18px; }
+        .summary td { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; text-align: center; }
+        .summary .label { color: #475569; font-size: 9pt; text-transform: uppercase; }
+        .summary .value { font-weight: 700; color: #0f172a; font-size: 13pt; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #166534; color: #fff; padding: 7px 5px; border: 1px solid #14532d; font-size: 9.5pt; }
+        td { padding: 6px 5px; border: 1px solid #cbd5e1; vertical-align: top; }
+        tbody tr:nth-child(even) td { background: #f8fafc; }
+        .center { text-align: center; }
+        .right, .money { text-align: right; white-space: nowrap; }
+        .product { font-weight: 600; }
+        .total td { background: #dcfce7 !important; font-weight: 700; }
+        .danger { color: #b91c1c; font-weight: 700; }
+        .empty { text-align: center; color: #64748b; font-style: italic; padding: 18px; }
+        .status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+        .note { margin-top: 14px; color: #64748b; font-size: 9pt; }
+        .signatures { margin-top: 36px; border-collapse: collapse; }
+        .signatures td { width: 50%; text-align: center; border: none; padding-top: 8px; }
+        .sign-title { font-weight: 700; }
+        .sign-space { height: 56px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company">Văn phòng phẩm Online</div>
+        <h1>BÁO CÁO DOANH THU - ĐƠN HÀNG</h1>
+        <div class="meta">Kỳ báo cáo: <b>${escapeHtml(period)}</b> &nbsp; | &nbsp; Ngày xuất: ${escapeHtml(exportDate)}</div>
+    </div>
+    <table class="summary">
+        <tr>
+            <td><div class="label">Tổng đơn hàng</div><div class="value">${fmt(periodOrders)}</div></td>
+            <td><div class="label">Đơn hoàn thành</div><div class="value">${fmt(statusSummary.completed)}</div></td>
+            <td><div class="label">Đang vận chuyển</div><div class="value">${fmt(statusSummary.processing)}</div></td>
+            <td><div class="label">Doanh thu hoàn thành</div><div class="value">${fmtCur(periodRevenue)}</div></td>
+            <td><div class="label">Sản phẩm đã bán</div><div class="value">${fmt(whSummary.totalSold)}</div></td>
+        </tr>
+    </table>
+    <h2>Thống kê trạng thái đơn hàng</h2>
+    <table>
+        <thead>
+            <tr><th>Trạng thái</th><th>Số đơn</th><th>Tỉ lệ</th></tr>
+        </thead>
+        <tbody>
+            ${statusRows}
+            <tr class="total"><td>Tổng cộng</td><td class="center">${fmt(periodOrders)}</td><td class="right">${fmtCur(periodRevenue)}</td></tr>
+        </tbody>
+    </table>
+    <h2>Chi tiết sản phẩm bán ra trong kỳ</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>STT</th>
+                <th>Sản phẩm</th>
+                <th>Danh mục</th>
+                <th>Tồn hiện tại</th>
+                <th>SL bán</th>
+                <th>Doanh thu</th>
+                <th>SL nhập</th>
+                <th>SL hư</th>
+            </tr>
+        </thead>
+        <tbody>${detailRows}</tbody>
+        <tfoot>
+            <tr class="total">
+                <td colspan="4">Tổng cộng</td>
+                <td class="center">${fmt(whSummary.totalSold)}</td>
+                <td class="money">${fmtCur(whSummary.totalRevenue)}</td>
+                <td class="center">${fmt(whSummary.totalReceived)}</td>
+                <td class="center danger">${fmt(whSummary.totalDamaged)}</td>
+            </tr>
+        </tfoot>
+    </table>
+    <div class="note">Ghi chú: Doanh thu lấy theo kỳ báo cáo đang lọc trên trang quản trị đơn hàng.</div>
+    <table class="signatures">
+        <tr>
+            <td><div class="sign-title">Người lập báo cáo</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Quản trị viên</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+    downloadBlob('\ufeff' + html, `bao-cao-doanh-thu-${startDate || 'all'}-${endDate || 'all'}.doc`, 'application/msword;charset=utf-8');
 };
 
 const Orders = () => {
@@ -56,36 +208,6 @@ const Orders = () => {
 
     useEffect(() => { loadOrders(); }, [page, statusFilter, appliedStart, appliedEnd, autoTick]);
     useEffect(() => { loadRevenueSummary(); }, [appliedStart, appliedEnd, autoTick]);
-
-    // Demo: tự động nâng trạng thái đơn hàng mỗi 5 giây
-    useEffect(() => {
-        const advance = async () => {
-            try {
-                // Bước 1: Processing → Completed
-                const r1 = await orderApi.getAllOrders({ status: 'Processing', page: 1, pageSize: 50 });
-                const processing = r1.data?.items || [];
-                if (processing.length > 0) {
-                    await Promise.all(processing.map(o =>
-                        orderApi.updateStatus(o.id, 'Completed').catch(() => {})
-                    ));
-                }
-                // Bước 2: Pending → Processing
-                const r2 = await orderApi.getAllOrders({ status: 'Pending', page: 1, pageSize: 50 });
-                const pending = r2.data?.items || [];
-                if (pending.length > 0) {
-                    await Promise.all(pending.map(o =>
-                        orderApi.approve(o.id)
-                            .catch(() => orderApi.updateStatus(o.id, 'Processing').catch(() => {}))
-                    ));
-                }
-                if (processing.length > 0 || pending.length > 0) {
-                    setAutoTick(t => t + 1);
-                }
-            } catch {}
-        };
-        const timer = setInterval(advance, 5000);
-        return () => clearInterval(timer);
-    }, []);
 
     const loadOrders = async () => {
         setLoading(true);
@@ -178,17 +300,6 @@ const Orders = () => {
         } finally { setActionLoading(false); }
     };
 
-    const handleComplete = async (orderId) => {
-        if (!window.confirm('Xác nhận đơn hàng đã giao thành công?')) return;
-        setActionLoading(true);
-        try {
-            await orderApi.updateStatus(orderId, 'Completed');
-            await Promise.all([loadOrders(), loadRevenueSummary()]);
-        } catch (error) {
-            alert(error.response?.data?.message || 'Cập nhật trạng thái thất bại');
-        } finally { setActionLoading(false); }
-    };
-
     const exportReportCSV = async () => {
         try {
             const [whRes] = await Promise.all([
@@ -223,6 +334,22 @@ const Orders = () => {
             URL.revokeObjectURL(url);
         } catch (err) {
             alert('Không thể xuất báo cáo. Vui lòng thử lại.');
+        }
+    };
+
+    const exportReportDOC = async () => {
+        try {
+            const whRes = await warehouseApi.getReport({ startDate: appliedStart, endDate: appliedEnd });
+            exportOrderReportDoc({
+                revenueSummary,
+                warehouseReport: whRes.data,
+                startDate: appliedStart,
+                endDate: appliedEnd,
+                periodOrders,
+                periodRevenue,
+            });
+        } catch (err) {
+            alert('Không thể xuất báo cáo DOC. Vui lòng thử lại.');
         }
     };
 
@@ -263,7 +390,7 @@ const Orders = () => {
             labels,
             datasets: [
                 { label: 'Hoàn thành', data: revenueSummary.ordersByDay.map(d => d.completed), backgroundColor: '#28a745', stack: 'orders' },
-                { label: 'Đang xử lý', data: revenueSummary.ordersByDay.map(d => d.processing), backgroundColor: '#17a2b8', stack: 'orders' },
+                { label: 'Đang vận chuyển', data: revenueSummary.ordersByDay.map(d => d.processing), backgroundColor: '#17a2b8', stack: 'orders' },
                 { label: 'Chờ duyệt', data: revenueSummary.ordersByDay.map(d => d.pending), backgroundColor: '#ffc107', stack: 'orders' },
                 { label: 'Đã hủy/Từ chối', data: revenueSummary.ordersByDay.map(d => d.cancelled + d.rejected), backgroundColor: '#dc3545', stack: 'orders' },
             ]
@@ -276,7 +403,7 @@ const Orders = () => {
         const values = [s.pending, s.processing, s.completed, s.cancelled, s.rejected];
         if (values.every(v => v === 0)) return null;
         return {
-            labels: ['Chờ duyệt', 'Đang xử lý', 'Hoàn thành', 'Đã hủy', 'Từ chối'],
+            labels: ['Chờ duyệt', 'Đang vận chuyển', 'Hoàn thành', 'Đã hủy', 'Từ chối'],
             datasets: [{
                 data: values,
                 backgroundColor: ['#ffc107', '#17a2b8', '#28a745', '#6c757d', '#dc3545'],
@@ -425,16 +552,16 @@ const Orders = () => {
                     )}
 
                     <div className="card">
-                        <div className="card-header p-0">
+                        <div className="card-header p-0 bg-primary">
                             <ul className="nav nav-tabs" role="tablist">
                                 <li className="nav-item">
-                                    <a className={`nav-link ${activeTab === 'list' ? 'active' : ''}`} href="#"
+                                    <a className={`nav-link ${activeTab === 'list' ? 'active bg-white text-primary font-weight-bold' : 'text-white'}`} href="#"
                                         onClick={(e) => { e.preventDefault(); setActiveTab('list'); }}>
                                         <i className="fas fa-list mr-1"></i>Danh sách đơn hàng
                                     </a>
                                 </li>
                                 <li className="nav-item">
-                                    <a className={`nav-link ${activeTab === 'chart' ? 'active' : ''}`} href="#"
+                                    <a className={`nav-link ${activeTab === 'chart' ? 'active bg-white text-primary font-weight-bold' : 'text-white'}`} href="#"
                                         onClick={(e) => { e.preventDefault(); setActiveTab('chart'); }}>
                                         <i className="fas fa-chart-bar mr-1"></i>Biểu đồ thống kê
                                     </a>
@@ -456,7 +583,7 @@ const Orders = () => {
                                                     onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
                                                     <option value="">Tất cả trạng thái</option>
                                                     <option value="Pending">Chờ duyệt</option>
-                                                    <option value="Processing">Đang xử lý</option>
+                                                    <option value="Processing">Đang vận chuyển</option>
                                                     <option value="Completed">Hoàn thành</option>
                                                     <option value="Cancelled">Đã hủy</option>
                                                     <option value="Rejected">Từ chối</option>
@@ -521,9 +648,9 @@ const Orders = () => {
                                                                             </>
                                                                         )}
                                                                         {order.status === 'Processing' && (
-                                                                            <button className="btn btn-xs btn-primary mr-1" onClick={() => handleComplete(order.id)} disabled={actionLoading}>
-                                                                                <i className="fas fa-check-double mr-1"></i>Hoàn thành
-                                                                            </button>
+                                                                            <span className="badge badge-info mr-1">
+                                                                                <i className="fas fa-truck mr-1"></i>Chờ khách nhận hàng
+                                                                            </span>
                                                                         )}
                                                                         {(order.status === 'Pending' || order.status === 'Processing') && (
                                                                             <button className="btn btn-xs btn-warning" onClick={() => handleCancel(order.id)} disabled={actionLoading}>
@@ -575,6 +702,9 @@ const Orders = () => {
                                 <div className="d-flex justify-content-end mb-3">
                                     <button className="btn btn-success btn-sm" onClick={exportReportCSV}>
                                         <i className="fas fa-file-csv mr-1"></i>Xuất báo cáo CSV
+                                    </button>
+                                    <button className="btn btn-primary btn-sm ml-2" onClick={exportReportDOC} disabled={!revenueSummary}>
+                                        <i className="fas fa-file-word mr-1"></i>Xuất báo cáo DOC
                                     </button>
                                 </div>
                                 {chartLoading ? (
@@ -796,11 +926,7 @@ const Orders = () => {
                                             )}
                                             {orderDetail.order.status === 'Processing' && (
                                                 <div className="alert alert-info d-flex justify-content-between align-items-center mb-0">
-                                                    <span><i className="fas fa-truck mr-1"></i>Đơn hàng đang được xử lý</span>
-                                                    <button className="btn btn-sm btn-primary"
-                                                        onClick={() => { closeDetail(); handleComplete(orderDetail.order.id); }} disabled={actionLoading}>
-                                                        <i className="fas fa-check-double mr-1"></i>Xác nhận hoàn thành
-                                                    </button>
+                                                    <span><i className="fas fa-truck mr-1"></i>Đơn hàng đang vận chuyển, chờ khách xác nhận đã nhận hàng</span>
                                                 </div>
                                             )}
                                         </>

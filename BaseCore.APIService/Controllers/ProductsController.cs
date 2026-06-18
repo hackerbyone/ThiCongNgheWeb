@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using BaseCore.Entities;
 using BaseCore.Repository.EFCore;
 
@@ -18,17 +20,50 @@ namespace BaseCore.APIService.Controllers
         private readonly ICategoryRepository _categoryRepository;
         private readonly IOrderDetailRepository _orderDetailRepository;
         private readonly IManufacturerRepository _manufacturerRepository;
+        private readonly BaseCore.Repository.AppDbContext _db;
 
         public ProductsController(
             IProductRepository productRepository,
             ICategoryRepository categoryRepository,
             IOrderDetailRepository orderDetailRepository,
-            IManufacturerRepository manufacturerRepository)
+            IManufacturerRepository manufacturerRepository,
+            BaseCore.Repository.AppDbContext db)
         {
             _productRepository = productRepository;
             _categoryRepository = categoryRepository;
             _orderDetailRepository = orderDetailRepository;
             _manufacturerRepository = manufacturerRepository;
+            _db = db;
+        }
+
+        private async Task<object> ToProductResponse(Product p)
+        {
+            var stats = await _db.ProductReviews
+                .Where(r => r.ProductId == p.Id)
+                .GroupBy(r => r.ProductId)
+                .Select(g => new
+                {
+                    ReviewCount = g.Count(),
+                    AverageRating = Math.Round(g.Average(r => r.Rating), 1)
+                })
+                .FirstOrDefaultAsync();
+
+            return new
+            {
+                p.Id,
+                p.Name,
+                p.Price,
+                p.Stock,
+                p.ImageUrl,
+                p.Description,
+                p.CategoryId,
+                p.DiscountPercent,
+                p.ManufacturerId,
+                p.Category,
+                p.Manufacturer,
+                averageRating = stats?.AverageRating ?? 0,
+                reviewCount = stats?.ReviewCount ?? 0
+            };
         }
 
         /// <summary>
@@ -54,9 +89,13 @@ namespace BaseCore.APIService.Controllers
                     minPrice, maxPrice, brand,
                     discountOnly, page, pageSize, sortBy);
 
+                var shapedProducts = new List<object>();
+                foreach (var product in products)
+                    shapedProducts.Add(await ToProductResponse(product));
+
                 return Ok(new
                 {
-                    items = products,
+                    items = shapedProducts,
                     totalCount,
                     page,
 
@@ -82,7 +121,7 @@ namespace BaseCore.APIService.Controllers
                 if (product == null)
                     return NotFound(new { message = "Product not found" });
 
-                return Ok(product);
+                return Ok(await ToProductResponse(product));
             }
             catch (Exception ex)
             {
@@ -201,7 +240,7 @@ namespace BaseCore.APIService.Controllers
         /// POST /api/products/{id}/image  — multipart/form-data, field name: "image"
         /// </summary>
         [HttpPost("{id}/image")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> UploadImage(int id, IFormFile? image)
         {
             var product = await _productRepository.GetByIdAsync(id);
@@ -242,7 +281,7 @@ namespace BaseCore.APIService.Controllers
         /// Update product discount
         /// </summary>
         [HttpPut("{id}/discount")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> UpdateDiscount(int id, [FromBody] UpdateDiscountDto dto)
         {
             if (dto.DiscountPercent < 0 || dto.DiscountPercent > 99)
@@ -265,7 +304,86 @@ namespace BaseCore.APIService.Controllers
         public async Task<IActionResult> GetByCategory(int categoryId)
         {
             var products = await _productRepository.GetByCategoryAsync(categoryId);
-            return Ok(products);
+            var shapedProducts = new List<object>();
+            foreach (var product in products)
+                shapedProducts.Add(await ToProductResponse(product));
+            return Ok(shapedProducts);
+        }
+
+        [HttpGet("{id}/reviews")]
+        public async Task<IActionResult> GetReviews(int id)
+        {
+            var product = await _productRepository.GetByIdAsync(id);
+            if (product == null)
+                return NotFound(new { message = "Không tìm thấy sản phẩm" });
+
+            var reviews = await _db.ProductReviews
+                .Where(r => r.ProductId == id)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.ProductId,
+                    r.OrderId,
+                    r.Rating,
+                    r.Comment,
+                    r.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                averageRating = reviews.Count == 0 ? 0 : Math.Round(reviews.Average(r => r.Rating), 1),
+                reviewCount = reviews.Count,
+                items = reviews
+            });
+        }
+
+        [HttpPost("{id}/reviews")]
+        [Authorize]
+        public async Task<IActionResult> CreateReview(int id, [FromBody] ProductReviewDto dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
+                return Unauthorized();
+
+            if (dto.Rating < 1 || dto.Rating > 5)
+                return BadRequest(new { message = "Số sao đánh giá phải từ 1 đến 5" });
+
+            var comment = (dto.Comment ?? "").Trim();
+            if (comment.Length > 1000)
+                return BadRequest(new { message = "Bình luận tối đa 1000 ký tự" });
+
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == dto.OrderId && o.UserId == userGuid);
+            if (order == null)
+                return BadRequest(new { message = "Không tìm thấy đơn hàng hợp lệ" });
+
+            if (order.Status != "Completed")
+                return BadRequest(new { message = "Chỉ có thể đánh giá sau khi đã nhận hàng" });
+
+            var purchased = await _db.OrderDetails.AnyAsync(d => d.OrderId == dto.OrderId && d.ProductId == id);
+            if (!purchased)
+                return BadRequest(new { message = "Sản phẩm không thuộc đơn hàng này" });
+
+            var review = await _db.ProductReviews
+                .FirstOrDefaultAsync(r => r.OrderId == dto.OrderId && r.ProductId == id && r.UserId == userGuid);
+
+            if (review != null)
+                return BadRequest(new { message = "Bạn chỉ được đánh giá sản phẩm này một lần trong đơn hàng này" });
+
+            review = new ProductReview
+            {
+                ProductId = id,
+                OrderId = dto.OrderId,
+                UserId = userGuid,
+                Rating = dto.Rating,
+                Comment = comment,
+                CreatedAt = DateTime.Now
+            };
+            _db.ProductReviews.Add(review);
+
+            await _db.SaveChangesAsync();
+            return Ok(new { message = "Đã lưu đánh giá sản phẩm", review });
         }
     }
 
@@ -319,5 +437,12 @@ namespace BaseCore.APIService.Controllers
     {
         [Range(0, 99, ErrorMessage = "Giảm giá phải từ 0 đến 99")]
         public decimal DiscountPercent { get; set; }
+    }
+
+    public class ProductReviewDto
+    {
+        public int OrderId { get; set; }
+        public int Rating { get; set; }
+        public string? Comment { get; set; }
     }
 }

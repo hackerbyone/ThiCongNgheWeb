@@ -1,11 +1,18 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { loadAdminAssets } from '../../utils/loadAdminAssets'
 import './admin.css'
 
 export default function AdminLayout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout, isAdmin, isWarehouse } = useAuth()
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    loadAdminAssets().then(() => setReady(true))
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -13,6 +20,17 @@ export default function AdminLayout({ children }) {
   }
 
   const isActive = (path) => location.pathname === path ? 'active' : ''
+
+  if (!ready) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f4f6f9' }}>
+        <div style={{ textAlign: 'center', color: '#6c757d' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⚙️</div>
+          <div>Đang tải giao diện quản trị...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="wrapper">

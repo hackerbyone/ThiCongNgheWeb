@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export default function Footer() {
   return (
     <footer className="bg-primary-800 text-white mt-12">
@@ -28,9 +30,33 @@ export default function Footer() {
         <div>
           <h4 className="font-bold mb-3 text-base">Liên hệ</h4>
           <ul className="space-y-2 text-gray-300">
-            <li>📞 Hotline: 0827027392 </li>
-            <li>📧 support@vanphongpham.vn</li>
+            <li>📞 Hotline: 0827 027 392</li>
             <li>📍 Thới Bình, Cà Mau</li>
+            <li>
+              <a
+                href="https://zalo.me/0827027392"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white flex items-center gap-1"
+              >
+                <span className="text-blue-400">💬</span> Zalo: 0827 027 392
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://web.facebook.com/minhtri.trinh.750/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white flex items-center gap-1"
+              >
+                <span className="text-indigo-400">📘</span> Facebook
+              </a>
+            </li>
+            <li>
+              <Link to="/contact" className="hover:text-white underline">
+                Trang liên hệ →
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

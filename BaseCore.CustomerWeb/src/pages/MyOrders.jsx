@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import orderApi from '../api/orderApi'
+import productApi from '../api/productApi'
 import { formatVND, formatDate } from '../utils/format'
 import { toast } from 'react-toastify'
 
 const STATUS_LABEL = {
   Pending: 'Chờ duyệt',
-  Processing: 'Đã duyệt - Đang xử lý',
+  Processing: 'Đang vận chuyển',
   Completed: 'Hoàn thành',
   Cancelled: 'Đã hủy',
   Rejected: 'Không được duyệt',
@@ -28,6 +29,9 @@ export default function MyOrders() {
   const [expandedId, setExpandedId] = useState(null)
   const [detailCache, setDetailCache] = useState({})
   const [cancellingId, setCancellingId] = useState(null)
+  const [receivingId, setReceivingId] = useState(null)
+  const [reviewDrafts, setReviewDrafts] = useState({})
+  const [reviewingKey, setReviewingKey] = useState('')
 
   const loadOrders = () => {
     if (!user) return
@@ -78,6 +82,58 @@ export default function MyOrders() {
       toast.error(err?.response?.data?.message || 'Hủy đơn hàng thất bại')
     } finally {
       setCancellingId(null)
+    }
+  }
+
+  const handleReceived = async (orderId) => {
+    if (!window.confirm('Xác nhận bạn đã nhận được hàng cho đơn #' + orderId + '?')) return
+    setReceivingId(orderId)
+    try {
+      const res = await orderApi.markReceived(orderId)
+      const updated = res?.order || { status: 'Completed' }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updated, status: 'Completed' } : o))
+      toast.success('Đã xác nhận nhận hàng. Bạn có thể đánh giá sản phẩm.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Xác nhận nhận hàng thất bại')
+    } finally {
+      setReceivingId(null)
+    }
+  }
+
+  const setReviewDraft = (orderId, productId, field, value) => {
+    const key = `${orderId}-${productId}`
+    setReviewDrafts(prev => ({
+      ...prev,
+      [key]: {
+        rating: 5,
+        comment: '',
+        ...(prev[key] || {}),
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleSubmitReview = async (orderId, productId) => {
+    const key = `${orderId}-${productId}`
+    const draft = reviewDrafts[key] || { rating: 5, comment: '' }
+    setReviewingKey(key)
+    try {
+      await productApi.createReview(productId, {
+        orderId,
+        rating: Number(draft.rating || 5),
+        comment: draft.comment || '',
+      })
+      setDetailCache(prev => ({
+        ...prev,
+        [orderId]: (prev[orderId] || []).map(item =>
+          item.productId === productId ? { ...item, reviewed: true } : item
+        ),
+      }))
+      toast.success('Đã gửi đánh giá sản phẩm')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Gửi đánh giá thất bại')
+    } finally {
+      setReviewingKey('')
     }
   }
 
@@ -134,30 +190,107 @@ export default function MyOrders() {
                     <span className="font-medium">Địa chỉ giao hàng:</span> {order.shippingAddress || '—'}
                   </div>
 
+                  <div className="grid sm:grid-cols-2 gap-2 text-sm text-gray-600 mb-3">
+                    <div>
+                      <span className="font-medium">Phí vận chuyển:</span>{' '}
+                      {formatVND(order.shippingFee || 0)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Thanh toán:</span>{' '}
+                      {order.paymentMethod === 'BankTransfer' ? 'Chuyển khoản' : 'COD'}
+                    </div>
+                  </div>
+
                   {!detailCache[order.id] ? (
                     <div className="text-sm text-gray-400 py-2">Đang tải sản phẩm...</div>
                   ) : detailCache[order.id].length > 0 ? (
                     <div className="space-y-2 mb-3">
-                      {detailCache[order.id].map((d, i) => (
-                        <div key={i} className="flex justify-between text-sm bg-white border rounded p-2.5">
-                          <div>
-                            <div className="font-medium text-gray-800">{d.productName}</div>
-                            <div className="text-gray-500 text-xs">× {d.quantity} | {formatVND(d.unitPrice)} / cái</div>
+                      {detailCache[order.id].map((d, i) => {
+                        const reviewKey = `${order.id}-${d.productId}`
+                        const draft = reviewDrafts[reviewKey] || { rating: 5, comment: '' }
+                        return (
+                          <div key={i} className="text-sm bg-white border rounded p-2.5">
+                            <div className="flex justify-between gap-3">
+                              <div>
+                                <div className="font-medium text-gray-800">{d.productName}</div>
+                                <div className="text-gray-500 text-xs">× {d.quantity} | {formatVND(d.unitPrice)} / cái</div>
+                              </div>
+                              <div className="font-semibold text-primary-600">{formatVND(d.unitPrice * d.quantity)}</div>
+                            </div>
+                            {order.status === 'Completed' && d.reviewed && (
+                              <div className="mt-3 border-t pt-3 text-sm text-green-600 font-medium">
+                                Bạn đã đánh giá sản phẩm này.
+                              </div>
+                            )}
+                            {order.status === 'Completed' && !d.reviewed && (
+                              <div className="mt-3 border-t pt-3">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="text-gray-600">Đánh giá:</span>
+                                  {[1, 2, 3, 4, 5].map(star => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() => setReviewDraft(order.id, d.productId, 'rating', star)}
+                                      className={`text-xl leading-none ${star <= draft.rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                                      title={`${star} sao`}
+                                    >
+                                      ★
+                                    </button>
+                                  ))}
+                                </div>
+                                <textarea
+                                  value={draft.comment}
+                                  onChange={(e) => setReviewDraft(order.id, d.productId, 'comment', e.target.value)}
+                                  rows={2}
+                                  className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-primary-500"
+                                  placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSubmitReview(order.id, d.productId)}
+                                  disabled={reviewingKey === reviewKey}
+                                  className="mt-2 text-sm bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 text-white px-3 py-1.5 rounded"
+                                >
+                                  {reviewingKey === reviewKey ? 'Đang gửi...' : 'Gửi đánh giá'}
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="font-semibold text-primary-600">{formatVND(d.unitPrice * d.quantity)}</div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : null}
 
                   {order.status === 'Pending' && (
-                    <button
-                      onClick={() => handleCancel(order.id)}
-                      disabled={cancellingId === order.id}
-                      className="text-sm text-red-500 hover:text-red-700 border border-red-300 hover:border-red-500 px-3 py-1 rounded disabled:opacity-50"
-                    >
-                      {cancellingId === order.id ? 'Đang hủy...' : 'Hủy đơn hàng'}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      {order.paymentMethod === 'BankTransfer' && (
+                        <Link
+                          to={`/payment/${order.id}`}
+                          state={{ order }}
+                          className="text-sm text-primary-600 hover:text-primary-700 border border-primary-300 hover:border-primary-500 px-3 py-1 rounded"
+                        >
+                          Thanh toán
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => handleCancel(order.id)}
+                        disabled={cancellingId === order.id}
+                        className="text-sm text-red-500 hover:text-red-700 border border-red-300 hover:border-red-500 px-3 py-1 rounded disabled:opacity-50"
+                      >
+                        {cancellingId === order.id ? 'Đang hủy...' : 'Hủy đơn hàng'}
+                      </button>
+                    </div>
+                  )}
+                  {order.status === 'Processing' && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleReceived(order.id)}
+                        disabled={receivingId === order.id}
+                        className="text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-3 py-1.5 rounded"
+                      >
+                        {receivingId === order.id ? 'Đang xác nhận...' : 'Đã nhận được hàng'}
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

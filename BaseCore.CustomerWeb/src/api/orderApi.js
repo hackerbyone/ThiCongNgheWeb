@@ -20,6 +20,9 @@ const orderApi = {
   cancelOrder(id) {
     return axiosClient.put(`/orders/${id}/cancel`)
   },
+  markReceived(id) {
+    return axiosClient.put(`/orders/${id}/received`)
+  },
   // Admin: duyệt đơn hàng (trừ kho)
   approveOrder(id) {
     return axiosClient.put(`/orders/${id}/approve`)

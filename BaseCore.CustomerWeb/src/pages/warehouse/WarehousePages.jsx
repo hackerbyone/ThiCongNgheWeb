@@ -2,8 +2,8 @@
  * Warehouse portal sub-pages: WStock, WReceipts, WDamaged, WReport
  * Each exported as a named component for use as a separate route.
  */
-import React, { useState, useEffect, useCallback } from 'react'
-import { warehouseApi, productApi, categoryApi } from '../../services/api'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { warehouseApi, productApi, categoryApi, manufacturerApi } from '../../services/api'
 
 const fmt    = (n) => new Intl.NumberFormat('vi-VN').format(n || 0)
 const fmtCur = (n) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0)
@@ -15,6 +15,134 @@ const exportCSV = (rows, filename) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
     URL.revokeObjectURL(url)
+}
+
+const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+
+const downloadBlob = (content, filename, type) => {
+    const blob = new Blob([content], { type })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+}
+
+const exportWarehouseReportDoc = (report, startDate, endDate, filename) => {
+    if (!report) return
+    const summary = report.summary || {}
+    const details = report.details || []
+    const period = `${startDate || 'Tất cả'} đến ${endDate || 'Tất cả'}`
+    const exportDate = new Date().toLocaleString('vi-VN')
+    const detailRows = details.length
+        ? details.map((d, index) => `
+            <tr>
+                <td class="center">${index + 1}</td>
+                <td class="product">${escapeHtml(d.productName)}</td>
+                <td>${escapeHtml(d.categoryName)}</td>
+                <td class="center">${fmt(d.currentStock)}</td>
+                <td class="center">${fmt(d.quantityReceived)}</td>
+                <td class="money">${fmtCur(d.totalCostReceived)}</td>
+                <td class="center">${fmt(d.quantitySold)}</td>
+                <td class="money">${fmtCur(d.revenue)}</td>
+                <td class="center danger">${fmt(d.quantityDamaged)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="9" class="empty">Không có dữ liệu trong khoảng thời gian này</td></tr>'
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Báo cáo kho hàng</title>
+    <style>
+        @page { size: A4 landscape; margin: 1.2cm; }
+        body { font-family: Arial, sans-serif; color: #1f2937; font-size: 11pt; }
+        .header { border-bottom: 3px solid #1f4e79; padding-bottom: 10px; margin-bottom: 16px; }
+        .company { color: #64748b; font-size: 10pt; text-transform: uppercase; letter-spacing: 1px; }
+        h1 { color: #1f4e79; font-size: 22pt; margin: 4px 0; text-align: center; }
+        h2 { color: #1f4e79; font-size: 14pt; margin: 16px 0 8px; }
+        .meta { text-align: center; color: #475569; margin-bottom: 14px; }
+        .summary { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 12px 0 18px; }
+        .summary td { background: #eef6ff; border: 1px solid #bfdbfe; padding: 10px; text-align: center; }
+        .summary .label { color: #475569; font-size: 9pt; text-transform: uppercase; }
+        .summary .value { font-weight: 700; color: #0f172a; font-size: 13pt; margin-top: 4px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .detail th { background: #1f4e79; color: #fff; padding: 7px 5px; border: 1px solid #1e3a5f; font-size: 9.5pt; }
+        .detail td { padding: 6px 5px; border: 1px solid #cbd5e1; vertical-align: top; }
+        .detail tr:nth-child(even) td { background: #f8fafc; }
+        .center { text-align: center; }
+        .money { text-align: right; white-space: nowrap; }
+        .product { font-weight: 600; }
+        .total td { background: #e0f2fe !important; font-weight: 700; }
+        .danger { color: #b91c1c; font-weight: 700; }
+        .empty { text-align: center; color: #64748b; font-style: italic; padding: 18px; }
+        .note { margin-top: 14px; color: #64748b; font-size: 9pt; }
+        .signatures { width: 100%; margin-top: 36px; border-collapse: collapse; }
+        .signatures td { width: 50%; text-align: center; border: none; padding-top: 8px; }
+        .sign-title { font-weight: 700; }
+        .sign-space { height: 56px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company">Văn phòng phẩm Online</div>
+        <h1>BÁO CÁO KHO HÀNG</h1>
+        <div class="meta">Kỳ báo cáo: <b>${escapeHtml(period)}</b> &nbsp; | &nbsp; Ngày xuất: ${escapeHtml(exportDate)}</div>
+    </div>
+    <table class="summary">
+        <tr>
+            <td><div class="label">Tổng nhập</div><div class="value">${fmt(summary.totalReceived)}</div></td>
+            <td><div class="label">Tổng bán</div><div class="value">${fmt(summary.totalSold)}</div></td>
+            <td><div class="label">Hư hỏng</div><div class="value">${fmt(summary.totalDamaged)}</div></td>
+            <td><div class="label">Doanh thu</div><div class="value">${fmtCur(summary.totalRevenue)}</div></td>
+            <td><div class="label">Chi phí nhập</div><div class="value">${fmtCur(summary.totalCost)}</div></td>
+        </tr>
+    </table>
+    <h2>Chi tiết theo sản phẩm</h2>
+    <table class="detail">
+        <thead>
+            <tr>
+                <th>STT</th>
+                <th>Sản phẩm</th>
+                <th>Danh mục</th>
+                <th>Tồn hiện tại</th>
+                <th>SL nhập</th>
+                <th>Chi phí nhập</th>
+                <th>SL bán</th>
+                <th>Doanh thu</th>
+                <th>SL hư</th>
+            </tr>
+        </thead>
+        <tbody>${detailRows}</tbody>
+        <tfoot>
+            <tr class="total">
+                <td colspan="4">Tổng cộng</td>
+                <td class="center">${fmt(summary.totalReceived)}</td>
+                <td class="money">${fmtCur(summary.totalCost)}</td>
+                <td class="center">${fmt(summary.totalSold)}</td>
+                <td class="money">${fmtCur(summary.totalRevenue)}</td>
+                <td class="center danger">${fmt(summary.totalDamaged)}</td>
+            </tr>
+        </tfoot>
+    </table>
+    <div class="note">Ghi chú: Báo cáo được xuất từ hệ thống quản lý kho Văn phòng phẩm Online.</div>
+    <table class="signatures">
+        <tr>
+            <td><div class="sign-title">Người lập báo cáo</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Quản lý kho</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+        </tr>
+    </table>
+</body>
+</html>`
+
+    downloadBlob('\ufeff' + html, filename, 'application/msword;charset=utf-8')
 }
 
 const Pager = ({ page, totalPages, onPage }) => (
@@ -130,6 +258,7 @@ export function WReceipts() {
     const [receipts, setReceipts] = useState([])
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
+    const [manufacturers, setManufacturers] = useState([])
     const [catFilter, setCatFilter] = useState('')
     const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1); const [totalPages, setTotalPages] = useState(0); const [total, setTotal] = useState(0)
@@ -137,14 +266,46 @@ export function WReceipts() {
     const [showModal, setShowModal] = useState(false); const [editing, setEditing] = useState(null)
     const [mode, setMode] = useState('existing') // 'existing' | 'new'
     const [form, setForm] = useState({ productId: '', quantity: 1, unitCost: 0, supplier: '', receivedDate: new Date().toISOString().split('T')[0], notes: '' })
-    const [newProd, setNewProd] = useState({ name: '', categoryId: '', price: 0, description: '' })
+    const [newProd, setNewProd] = useState({ name: '', categoryName: '', manufacturerName: '', price: '', discountPercent: 0, description: '', imageUrl: '' })
+    const [newProdImgMode, setNewProdImgMode] = useState('url')
+    const [newProdPreview, setNewProdPreview] = useState('')
+    const [newProdFile, setNewProdFile] = useState(null)
+    const newProdFileRef = useRef(null)
     const [error, setError] = useState('')
 
-    const reloadProducts = () => productApi.getAll({ pageSize: 999 }).then(r => setProducts(r.data.items || [])).catch(() => {})
+    const getErrorMessage = (err, fallback = 'Thao tác thất bại') => {
+        const data = err?.response?.data
+        if (data?.message) return data.message
+        if (data?.errors) {
+            const messages = Object.values(data.errors).flat().filter(Boolean)
+            if (messages.length) return messages.join('\n')
+        }
+        return err?.message || fallback
+    }
+
+    const reloadProducts = async () => {
+        const r = await warehouseApi.getProducts({ pageSize: 999 })
+        setProducts(r.data.items || [])
+    }
+
+    const reloadCategories = async () => {
+        const r = await categoryApi.getAll()
+        const items = r.data || []
+        setCategories(items)
+        return items
+    }
+
+    const reloadManufacturers = async () => {
+        const r = await manufacturerApi.getAll()
+        const items = r.data.items || r.data || []
+        setManufacturers(items)
+        return items
+    }
 
     useEffect(() => {
-        reloadProducts()
-        categoryApi.getAll().then(r => setCategories(r.data || [])).catch(() => {})
+        reloadProducts().catch(() => {})
+        reloadCategories().catch(() => {})
+        reloadManufacturers().catch(() => {})
     }, [])
     useEffect(() => { load() }, [page, startDate, endDate])
 
@@ -170,7 +331,9 @@ export function WReceipts() {
             setEditing(null)
             setMode('existing')
             setForm({ productId: '', quantity: 1, unitCost: 0, supplier: '', receivedDate: new Date().toISOString().split('T')[0], notes: '' })
-            setNewProd({ name: '', categoryId: '', price: 0, description: '' })
+            setNewProd({ name: '', categoryName: '', manufacturerName: '', price: '', discountPercent: 0, description: '', imageUrl: '' })
+            setNewProdImgMode('url'); setNewProdPreview(''); setNewProdFile(null)
+            if (newProdFileRef.current) newProdFileRef.current.value = ''
             setCatFilter('')
         }
         setError(''); setShowModal(true)
@@ -180,32 +343,97 @@ export function WReceipts() {
         setMode(m)
         setError('')
         setForm(f => ({ ...f, productId: '' }))
-        setNewProd({ name: '', categoryId: '', price: 0, description: '' })
+        setNewProd({ name: '', categoryName: '', manufacturerName: '', price: '', discountPercent: 0, description: '', imageUrl: '' })
+        setNewProdImgMode('url'); setNewProdPreview(''); setNewProdFile(null)
+        if (newProdFileRef.current) newProdFileRef.current.value = ''
         setCatFilter('')
     }
 
     const submit = async (e) => {
         e.preventDefault(); setError('')
+        let uploadWarning = ''
         try {
             let productId = parseInt(form.productId)
+            const quantity = parseInt(form.quantity)
+            const unitCost = parseFloat(form.unitCost || 0)
+            if (!quantity || quantity <= 0) { setError('Số lượng nhập kho phải lớn hơn 0'); return }
+            if (Number.isNaN(unitCost) || unitCost < 0) { setError('Đơn giá nhập không được âm'); return }
             if (mode === 'new') {
                 if (!newProd.name.trim()) { setError('Vui lòng nhập tên sản phẩm mới'); return }
-                if (!newProd.categoryId) { setError('Vui lòng chọn danh mục cho sản phẩm mới'); return }
+                if (!newProd.categoryName.trim()) { setError('Vui lòng nhập tên danh mục cho sản phẩm mới'); return }
+                const parsedPrice = parseFloat(newProd.price)
+                if (!parsedPrice || parsedPrice <= 0) { setError('Giá bán phải lớn hơn 0'); return }
+                const parsedDiscount = parseFloat(newProd.discountPercent) || 0
+                if (parsedDiscount < 0 || parsedDiscount > 99) { setError('Giảm giá phải từ 0 đến 99%'); return }
+                const categoryName = newProd.categoryName.trim()
+                const existing = categories.find(c => c.name?.trim().toLowerCase() === categoryName.toLowerCase())
+                let catId
+                if (existing) {
+                    catId = existing.id
+                } else {
+                    try {
+                        const catRes = await categoryApi.create({ name: categoryName })
+                        catId = catRes.data.id
+                        await reloadCategories()
+                    } catch (catErr) {
+                        const refreshedCategories = await reloadCategories()
+                        const fallbackCategory = refreshedCategories.find(c => c.name?.trim().toLowerCase() === categoryName.toLowerCase())
+                        if (!fallbackCategory) throw catErr
+                        catId = fallbackCategory.id
+                    }
+                }
+
+                const manufacturerName = newProd.manufacturerName.trim()
+                let manufacturerId = null
+                if (manufacturerName) {
+                    const existingManufacturer = manufacturers.find(m => m.name?.trim().toLowerCase() === manufacturerName.toLowerCase())
+                    if (existingManufacturer) {
+                        manufacturerId = existingManufacturer.id
+                    } else {
+                        try {
+                            const manufacturerRes = await manufacturerApi.create({ name: manufacturerName })
+                            manufacturerId = manufacturerRes.data.id
+                            await reloadManufacturers()
+                        } catch (manufacturerErr) {
+                            const refreshedManufacturers = await reloadManufacturers()
+                            const fallbackManufacturer = refreshedManufacturers.find(m => m.name?.trim().toLowerCase() === manufacturerName.toLowerCase())
+                            if (!fallbackManufacturer) throw manufacturerErr
+                            manufacturerId = fallbackManufacturer.id
+                        }
+                    }
+                }
+
                 const res = await warehouseApi.createProduct({
                     name: newProd.name.trim(),
-                    categoryId: parseInt(newProd.categoryId),
-                    price: parseFloat(newProd.price) || 0,
+                    categoryId: catId,
+                    manufacturerId,
+                    price: parsedPrice,
                     stock: 0,
-                    description: newProd.description || ''
+                    discountPercent: parsedDiscount,
+                    description: newProd.description || '',
+                    imageUrl: newProdImgMode === 'url' ? (newProd.imageUrl || '') : '',
+                    stockNote: ''
                 })
                 productId = res.data.id
-                reloadProducts()
+                if (!productId) throw new Error('Không nhận được mã sản phẩm mới từ máy chủ')
+                if (newProdFile) {
+                    try {
+                        await productApi.uploadImage(productId, newProdFile)
+                    } catch (uploadErr) {
+                        uploadWarning = getErrorMessage(uploadErr, 'Upload ảnh thất bại')
+                    }
+                }
+                await reloadProducts()
+            } else if (!productId) {
+                setError('Vui lòng chọn sản phẩm cần nhập kho')
+                return
             }
-            const payload = { ...form, productId, quantity: parseInt(form.quantity), unitCost: parseFloat(form.unitCost) }
+            const payload = { ...form, productId, quantity, unitCost }
             if (editing) await warehouseApi.updateReceipt(editing.id, payload)
             else await warehouseApi.createReceipt(payload)
             setShowModal(false); load()
-        } catch (err) { setError(err.response?.data?.message || 'Thao tác thất bại') }
+            if (uploadWarning) alert(`Đã tạo sản phẩm và nhập kho thành công, nhưng ảnh chưa tải lên được: ${uploadWarning}`)
+        } catch (err) { setError(getErrorMessage(err)) }
     }
 
     const del = async (id) => {
@@ -347,22 +575,112 @@ export function WReceipts() {
                                                     <div className="col-md-4">
                                                         <div className="form-group">
                                                             <label>Giá bán (₫)</label>
-                                                            <input type="number" className="form-control" min="0" step="100" value={newProd.price} onChange={e => setNewProd({ ...newProd, price: e.target.value })} />
+                                                            <input type="number" className="form-control" required min="1" step="1" placeholder="Nhập giá > 0" value={newProd.price} onChange={e => setNewProd({ ...newProd, price: e.target.value })} />
                                                         </div>
                                                     </div>
-                                                    <div className="col-md-6">
+                                                    <div className="col-md-4">
                                                         <div className="form-group">
                                                             <label>Danh mục <span className="text-danger">*</span></label>
-                                                            <select className="form-control" value={newProd.categoryId} onChange={e => setNewProd({ ...newProd, categoryId: e.target.value })}>
-                                                                <option value="">-- Chọn danh mục --</option>
-                                                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                            </select>
+                                                            <input
+                                                                className="form-control"
+                                                                placeholder="Nhập tên danh mục..."
+                                                                value={newProd.categoryName}
+                                                                onChange={e => setNewProd({ ...newProd, categoryName: e.target.value })}
+                                                                list="cat-suggestions"
+                                                                autoComplete="off"
+                                                            />
+                                                            <datalist id="cat-suggestions">
+                                                                {categories.map(c => <option key={c.id} value={c.name} />)}
+                                                            </datalist>
+                                                            <small className="text-muted">Gõ tên mới hoặc chọn từ gợi ý để dùng danh mục có sẵn</small>
                                                         </div>
                                                     </div>
-                                                    <div className="col-md-6">
+                                                    <div className="col-md-4">
+                                                        <div className="form-group">
+                                                            <label>Nhà sản xuất</label>
+                                                            <input
+                                                                className="form-control"
+                                                                placeholder="Nhập tên nhà sản xuất..."
+                                                                value={newProd.manufacturerName}
+                                                                onChange={e => setNewProd({ ...newProd, manufacturerName: e.target.value })}
+                                                                list="manufacturer-suggestions"
+                                                                autoComplete="off"
+                                                            />
+                                                            <datalist id="manufacturer-suggestions">
+                                                                {manufacturers.map(m => <option key={m.id} value={m.name} />)}
+                                                            </datalist>
+                                                            <small className="text-muted">Gõ tên mới hoặc chọn từ gợi ý để dùng nhà sản xuất có sẵn</small>
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-md-4">
+                                                        <div className="form-group">
+                                                            <label>Giảm giá (%)</label>
+                                                            <input type="number" className="form-control" min="0" max="99" step="1" value={newProd.discountPercent} onChange={e => setNewProd({ ...newProd, discountPercent: e.target.value })} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-12">
                                                         <div className="form-group">
                                                             <label>Mô tả ngắn</label>
                                                             <input className="form-control" placeholder="Không bắt buộc" value={newProd.description} onChange={e => setNewProd({ ...newProd, description: e.target.value })} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="col-12">
+                                                        <div className="form-group">
+                                                            <label>Ảnh sản phẩm</label>
+                                                            <div className="mb-2 text-center" style={{ background: '#f8f9fa', border: '1px dashed #ced4da', borderRadius: 6, padding: 8, minHeight: 90 }}>
+                                                                {(newProdPreview || (newProdImgMode === 'url' && newProd.imageUrl)) ? (
+                                                                    <img
+                                                                        src={newProdPreview || newProd.imageUrl}
+                                                                        alt="preview"
+                                                                        style={{ maxHeight: 110, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
+                                                                        onError={e => { e.target.style.display = 'none' }}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-muted py-2">
+                                                                        <i className="fas fa-image fa-2x d-block mb-1"></i>
+                                                                        <small>Chưa có ảnh</small>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="btn-group btn-group-sm w-100 mb-2" role="group">
+                                                                <button type="button"
+                                                                    className={`btn ${newProdImgMode === 'url' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                                                                    onClick={() => { setNewProdImgMode('url'); setNewProdFile(null); setNewProdPreview(''); if (newProdFileRef.current) newProdFileRef.current.value = '' }}>
+                                                                    <i className="fas fa-link mr-1"></i>Nhập URL
+                                                                </button>
+                                                                <button type="button"
+                                                                    className={`btn ${newProdImgMode === 'upload' ? 'btn-info' : 'btn-outline-info'}`}
+                                                                    onClick={() => { setNewProdImgMode('upload'); setNewProd(p => ({ ...p, imageUrl: '' })); setNewProdPreview('') }}>
+                                                                    <i className="fas fa-upload mr-1"></i>Tải lên từ máy
+                                                                </button>
+                                                            </div>
+                                                            {newProdImgMode === 'url' ? (
+                                                                <input
+                                                                    className="form-control form-control-sm"
+                                                                    placeholder="https://example.com/anh.jpg"
+                                                                    value={newProd.imageUrl}
+                                                                    onChange={e => { setNewProd(p => ({ ...p, imageUrl: e.target.value })); setNewProdPreview('') }}
+                                                                />
+                                                            ) : (
+                                                                <div className="custom-file">
+                                                                    <input
+                                                                        type="file"
+                                                                        className="custom-file-input"
+                                                                        id="newProdImgFile"
+                                                                        accept="image/jpeg,image/png,image/gif,image/webp"
+                                                                        ref={newProdFileRef}
+                                                                        onChange={e => {
+                                                                            const f = e.target.files?.[0]
+                                                                            if (!f) return
+                                                                            setNewProdFile(f)
+                                                                            setNewProdPreview(URL.createObjectURL(f))
+                                                                        }}
+                                                                    />
+                                                                    <label className="custom-file-label" htmlFor="newProdImgFile" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                                                        {newProdFile ? newProdFile.name : 'Chọn file ảnh (.jpg .png .gif .webp)'}
+                                                                    </label>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </>
@@ -738,6 +1056,10 @@ export function WReport() {
         ], `bao-cao-kho-${rptStart}-${rptEnd}.csv`)
     }
 
+    const doExportDoc = () => {
+        exportWarehouseReportDoc(report, rptStart, rptEnd, `bao-cao-kho-${rptStart}-${rptEnd}.doc`)
+    }
+
     return (
         <div className="content-wrapper">
             <div className="content-header"><div className="container-fluid">
@@ -761,6 +1083,9 @@ export function WReport() {
                             <div className="col-md-5 text-right">
                                 <button className="btn btn-success btn-sm" onClick={doExport} disabled={!report}>
                                     <i className="fas fa-file-csv mr-1"></i>Xuất CSV
+                                </button>
+                                <button className="btn btn-primary btn-sm ml-2" onClick={doExportDoc} disabled={!report}>
+                                    <i className="fas fa-file-word mr-1"></i>Xuất DOC
                                 </button>
                             </div>
                         </div>

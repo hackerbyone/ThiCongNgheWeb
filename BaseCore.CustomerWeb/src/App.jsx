@@ -11,9 +11,11 @@ import ProductDetail from './pages/ProductDetail'
 import Cart from './pages/Cart'
 import Checkout from './pages/Checkout'
 import OrderSuccess from './pages/OrderSuccess'
+import Payment from './pages/Payment'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import MyOrders from './pages/MyOrders'
+import Contact from './pages/Contact'
 import NotFound from './pages/NotFound'
 
 // Admin pages
@@ -77,9 +79,11 @@ export default function App() {
       <Route path="/cart" element={<CustomerLayout><Cart /></CustomerLayout>} />
       <Route path="/checkout" element={<CustomerLayout><Checkout /></CustomerLayout>} />
       <Route path="/orders/success" element={<CustomerLayout><OrderSuccess /></CustomerLayout>} />
+      <Route path="/payment/:orderId" element={<CustomerLayout><Payment /></CustomerLayout>} />
       <Route path="/orders" element={<CustomerLayout><MyOrders /></CustomerLayout>} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/contact" element={<CustomerLayout><Contact /></CustomerLayout>} />
 
       {/* Admin routes */}
       <Route path="/admin" element={<AdminRoute><Dashboard /></AdminRoute>} />

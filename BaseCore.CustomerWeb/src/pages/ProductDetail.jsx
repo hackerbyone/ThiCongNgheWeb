@@ -11,6 +11,7 @@ export default function ProductDetail() {
   const { addItem } = useCart()
   const [product, setProduct] = useState(null)
   const [related, setRelated] = useState([])
+  const [reviews, setReviews] = useState({ averageRating: 0, reviewCount: 0, items: [] })
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(true)
 
@@ -32,6 +33,10 @@ export default function ProductDetail() {
       })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false))
+
+    productApi.getReviews(id)
+      .then((res) => setReviews(res || { averageRating: 0, reviewCount: 0, items: [] }))
+      .catch(() => setReviews({ averageRating: 0, reviewCount: 0, items: [] }))
   }, [id])
 
   if (loading) return <Loading />
@@ -46,6 +51,8 @@ export default function ProductDetail() {
 
   const disc = product.discountPercent ?? 0
   const effectivePrice = disc > 0 ? product.price * (1 - disc / 100) : product.price
+  const averageRating = Number(product.averageRating || reviews.averageRating || 0)
+  const reviewCount = Number(product.reviewCount || reviews.reviewCount || 0)
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 fade-in">
@@ -73,6 +80,14 @@ export default function ProductDetail() {
 
         <div>
           <h1 className="text-2xl font-bold text-gray-800 mb-3">{product.name}</h1>
+          <div className="flex items-center gap-2 mb-3 text-sm">
+            <span className="text-yellow-400 text-lg">{renderStars(averageRating)}</span>
+            {reviewCount > 0 ? (
+              <span className="text-gray-600">{averageRating.toFixed(1)} / 5 ({reviewCount} đánh giá)</span>
+            ) : (
+              <span className="text-gray-400">Chưa có đánh giá</span>
+            )}
+          </div>
           <div className="mb-4">
             <div className="text-3xl font-bold text-primary-600">{formatVND(effectivePrice)}</div>
             {disc > 0 && (
@@ -109,12 +124,13 @@ export default function ProductDetail() {
               <input
                 type="number"
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, +e.target.value || 1))}
+                max={product.stock}
+                onChange={(e) => setQuantity(Math.min(product.stock, Math.max(1, +e.target.value || 1)))}
                 className="w-14 text-center outline-none py-1"
               />
               <button
                 className="px-3 py-1 hover:bg-gray-100"
-                onClick={() => setQuantity((q) => q + 1)}
+                onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
               >+</button>
             </div>
           </div>
@@ -127,16 +143,54 @@ export default function ProductDetail() {
             >
               🛒 Thêm vào giỏ
             </button>
-            <Link
-              to="/cart"
-              onClick={() => addItem({ ...product, price: effectivePrice }, quantity)}
-              className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded font-medium text-center"
-            >
-              Mua ngay
-            </Link>
+            {product.stock > 0 ? (
+              <Link
+                to="/cart"
+                onClick={() => addItem({ ...product, price: effectivePrice }, quantity)}
+                className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded font-medium text-center"
+              >
+                Mua ngay
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="flex-1 bg-gray-400 text-white px-6 py-3 rounded font-medium text-center"
+              >
+                Mua ngay
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      <section className="bg-white rounded-lg p-6 mt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-800">Đánh giá sản phẩm</h2>
+          <div className="text-sm text-gray-500">
+            {reviewCount > 0 ? `${averageRating.toFixed(1)} / 5 từ ${reviewCount} đánh giá` : 'Chưa có đánh giá'}
+          </div>
+        </div>
+        {reviews.items?.length > 0 ? (
+          <div className="space-y-3">
+            {reviews.items.map((review) => (
+              <div key={review.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <span className="text-yellow-400">{renderStars(review.rating)}</span>
+                  <span className="text-xs text-gray-400">{formatReviewDate(review.createdAt)}</span>
+                </div>
+                {review.comment ? (
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{review.comment}</p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">Khách hàng chưa để lại bình luận.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Sản phẩm này chưa có bình luận. Khách hàng có thể đánh giá sau khi nhận hàng.</p>
+        )}
+      </section>
 
       {/* Sản phẩm liên quan */}
       {related.length > 0 && (
@@ -149,4 +203,14 @@ export default function ProductDetail() {
       )}
     </div>
   )
+}
+
+function renderStars(value) {
+  const rating = Math.round(Number(value || 0))
+  return '★'.repeat(rating) + '☆'.repeat(Math.max(0, 5 - rating))
+}
+
+function formatReviewDate(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleDateString('vi-VN')
 }

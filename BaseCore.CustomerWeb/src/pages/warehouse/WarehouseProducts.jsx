@@ -15,12 +15,19 @@ export default function WarehouseProducts() {
     const [totalCount, setTotalCount] = useState(0)
     const [showModal, setShowModal] = useState(false)
     const [editing, setEditing] = useState(null)
-    const [form, setForm] = useState({ name: '', price: 0, stock: 0, categoryId: '', manufacturerId: '', description: '', imageUrl: '', discountPercent: 0, stockNote: '' })
+    const [form, setForm] = useState({ name: '', price: '', stock: 0, categoryId: '', manufacturerId: '', description: '', imageUrl: '', discountPercent: 0, stockNote: '' })
     const [imgMode, setImgMode] = useState('url')
     const [imgPreview, setImgPreview] = useState('')
     const [pendingFile, setPendingFile] = useState(null)
     const fileInputRef = useRef(null)
     const [error, setError] = useState('')
+    const [catInputMode, setCatInputMode] = useState('select') // 'select' | 'new'
+    const [newCategoryName, setNewCategoryName] = useState('')
+
+    // Quick-edit discount inline
+    const [editingDiscountId, setEditingDiscountId] = useState(null)
+    const [discountInput, setDiscountInput] = useState('')
+    const [savingDiscount, setSavingDiscount] = useState(false)
 
     useEffect(() => {
         categoryApi.getAll().then(r => setCategories(r.data || [])).catch(() => {})
@@ -32,7 +39,7 @@ export default function WarehouseProducts() {
     const load = async () => {
         setLoading(true)
         try {
-            const r = await productApi.getAll({ keyword: keyword || undefined, categoryId: catFilter || undefined, page, pageSize: 15 })
+            const r = await warehouseApi.getProducts({ keyword: keyword || undefined, categoryId: catFilter || undefined, page, pageSize: 15 })
             setProducts(r.data.items || [])
             setTotalPages(r.data.totalPages || 0)
             setTotalCount(r.data.totalCount || 0)
@@ -45,12 +52,14 @@ export default function WarehouseProducts() {
             setForm({ name: p.name, price: p.price, stock: p.stock, categoryId: p.categoryId, manufacturerId: p.manufacturerId || '', description: p.description || '', imageUrl: p.imageUrl || '', discountPercent: p.discountPercent || 0, stockNote: '' })
         } else {
             setEditing(null)
-            setForm({ name: '', price: 0, stock: 0, categoryId: categories[0]?.id || '', manufacturerId: '', description: '', imageUrl: '', discountPercent: 0, stockNote: '' })
+            setForm({ name: '', price: '', stock: 0, categoryId: categories[0]?.id || '', manufacturerId: '', description: '', imageUrl: '', discountPercent: 0, stockNote: '' })
         }
         setImgMode('url')
         setImgPreview('')
         setPendingFile(null)
         setError('')
+        setCatInputMode('select')
+        setNewCategoryName('')
         setShowModal(true)
     }
 
@@ -72,11 +81,21 @@ export default function WarehouseProducts() {
         e.preventDefault()
         setError('')
         try {
+            let catId = parseInt(form.categoryId)
+            if (!editing && catInputMode === 'new') {
+                if (!newCategoryName.trim()) {
+                    setError('Vui lòng nhập tên danh mục mới')
+                    return
+                }
+                const catRes = await categoryApi.create({ name: newCategoryName.trim() })
+                catId = catRes.data.id
+                categoryApi.getAll().then(r => setCategories(r.data || [])).catch(() => {})
+            }
             const payload = {
                 ...form,
                 price: parseFloat(form.price),
                 stock: parseInt(form.stock),
-                categoryId: parseInt(form.categoryId),
+                categoryId: catId,
                 manufacturerId: form.manufacturerId ? parseInt(form.manufacturerId) : null,
                 discountPercent: parseFloat(form.discountPercent) || 0,
             }
@@ -104,6 +123,35 @@ export default function WarehouseProducts() {
         if (!window.confirm('Xóa sản phẩm này? Không thể hoàn tác nếu đã có đơn hàng liên quan.')) return
         try { await warehouseApi.deleteProduct(id); load() }
         catch (err) { alert(err.response?.data?.message || 'Xóa thất bại') }
+    }
+
+    // Mở quick-edit discount
+    const startEditDiscount = (p) => {
+        setEditingDiscountId(p.id)
+        setDiscountInput(String(p.discountPercent || 0))
+    }
+
+    const cancelEditDiscount = () => {
+        setEditingDiscountId(null)
+        setDiscountInput('')
+    }
+
+    const saveDiscount = async (id) => {
+        const val = parseFloat(discountInput)
+        if (isNaN(val) || val < 0 || val > 99) {
+            alert('Giảm giá phải từ 0 đến 99%')
+            return
+        }
+        setSavingDiscount(true)
+        try {
+            await productApi.updateDiscount(id, val)
+            setProducts(prev => prev.map(p => p.id === id ? { ...p, discountPercent: val } : p))
+            setEditingDiscountId(null)
+        } catch {
+            alert('Cập nhật giảm giá thất bại')
+        } finally {
+            setSavingDiscount(false)
+        }
     }
 
     const getStockBadge = (s) => {
@@ -153,7 +201,7 @@ export default function WarehouseProducts() {
                                             <th>Danh mục</th>
                                             <th>NSX</th>
                                             <th className="text-right">Giá bán</th>
-                                            <th className="text-right">Giảm giá</th>
+                                            <th className="text-center" style={{ width: 160 }}>Giảm giá (%)</th>
                                             <th className="text-center">Tồn kho</th>
                                             <th style={{ width: 110 }}>Thao tác</th>
                                         </tr>
@@ -175,12 +223,61 @@ export default function WarehouseProducts() {
                                                 </td>
                                                 <td><span className="badge badge-secondary">{p.categoryName}</span></td>
                                                 <td>{p.manufacturerName || <span className="text-muted">—</span>}</td>
-                                                <td className="text-right">{fmt(p.price)} đ</td>
-                                                <td className="text-right">{p.discountPercent > 0 ? <span className="badge badge-warning">{p.discountPercent}%</span> : <span className="text-muted">—</span>}</td>
+                                                <td className="text-right">
+                                                    <span>{fmt(p.price)} đ</span>
+                                                    {p.discountPercent > 0 && (
+                                                        <div className="text-success small">
+                                                            → {fmt(p.price * (1 - p.discountPercent / 100))} đ
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="text-center align-middle">
+                                                    {editingDiscountId === p.id ? (
+                                                        <div className="d-flex align-items-center justify-content-center" style={{ gap: 4 }}>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="99"
+                                                                step="1"
+                                                                value={discountInput}
+                                                                onChange={e => setDiscountInput(e.target.value)}
+                                                                onKeyDown={e => { if (e.key === 'Enter') saveDiscount(p.id); if (e.key === 'Escape') cancelEditDiscount() }}
+                                                                className="form-control form-control-sm text-center"
+                                                                style={{ width: 64 }}
+                                                                autoFocus
+                                                            />
+                                                            <span className="text-muted">%</span>
+                                                            <button
+                                                                className="btn btn-sm btn-success py-0 px-1"
+                                                                onClick={() => saveDiscount(p.id)}
+                                                                disabled={savingDiscount}
+                                                                title="Lưu"
+                                                            >
+                                                                <i className="fas fa-check"></i>
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-sm btn-secondary py-0 px-1"
+                                                                onClick={cancelEditDiscount}
+                                                                title="Hủy"
+                                                            >
+                                                                <i className="fas fa-times"></i>
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span
+                                                            className={`badge ${p.discountPercent > 0 ? 'badge-warning' : 'badge-light'} cursor-pointer`}
+                                                            style={{ cursor: 'pointer', fontSize: '0.85em' }}
+                                                            onClick={() => startEditDiscount(p)}
+                                                            title="Click để chỉnh giảm giá"
+                                                        >
+                                                            {p.discountPercent > 0 ? `${p.discountPercent}% 🏷️` : '0% ✏️'}
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="text-center">{getStockBadge(p.stock)}</td>
                                                 <td>
-                                                    <button className="btn btn-sm btn-info mr-1" onClick={() => openModal(p)}><i className="fas fa-edit"></i></button>
-                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.id)}><i className="fas fa-trash"></i></button>
+                                                    <button className="btn btn-sm btn-info mr-1" onClick={() => openModal(p)} title="Sửa"><i className="fas fa-edit"></i></button>
+                                                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.id)} title="Xóa"><i className="fas fa-trash"></i></button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -224,16 +321,40 @@ export default function WarehouseProducts() {
                                             <div className="col-md-4">
                                                 <div className="form-group">
                                                     <label>Giá bán (đ) <span className="text-danger">*</span></label>
-                                                    <input type="number" className="form-control" required min="0" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+                                                    <input type="number" className="form-control" required min="1" step="1" placeholder="Nhập giá > 0" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
                                                 </div>
                                             </div>
                                             <div className="col-md-6">
                                                 <div className="form-group">
                                                     <label>Danh mục <span className="text-danger">*</span></label>
-                                                    <select className="form-control" required value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>
-                                                        <option value="">-- Chọn danh mục --</option>
-                                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                    </select>
+                                                    {!editing && (
+                                                        <div className="btn-group btn-group-sm w-100 mb-1" role="group">
+                                                            <button type="button"
+                                                                className={`btn ${catInputMode === 'select' ? 'btn-secondary' : 'btn-outline-secondary'}`}
+                                                                onClick={() => setCatInputMode('select')}>
+                                                                Chọn có sẵn
+                                                            </button>
+                                                            <button type="button"
+                                                                className={`btn ${catInputMode === 'new' ? 'btn-success' : 'btn-outline-success'}`}
+                                                                onClick={() => setCatInputMode('new')}>
+                                                                <i className="fas fa-plus mr-1"></i>Tạo danh mục mới
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {(!editing && catInputMode === 'new') ? (
+                                                        <input
+                                                            className="form-control"
+                                                            required
+                                                            placeholder="Nhập tên danh mục mới..."
+                                                            value={newCategoryName}
+                                                            onChange={e => setNewCategoryName(e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <select className="form-control" required value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>
+                                                            <option value="">-- Chọn danh mục --</option>
+                                                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                        </select>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="col-md-6">
@@ -257,7 +378,12 @@ export default function WarehouseProducts() {
                                             <div className="col-md-4">
                                                 <div className="form-group">
                                                     <label>Giảm giá (%)</label>
-                                                    <input type="number" className="form-control" min="0" max="100" value={form.discountPercent} onChange={e => setForm({ ...form, discountPercent: e.target.value })} />
+                                                    <input type="number" className="form-control" min="0" max="99" step="1" value={form.discountPercent} onChange={e => setForm({ ...form, discountPercent: e.target.value })} />
+                                                    {form.discountPercent > 0 && form.price > 0 && (
+                                                        <small className="text-success">
+                                                            Giá sau giảm: {fmt(form.price * (1 - form.discountPercent / 100))} đ
+                                                        </small>
+                                                    )}
                                                 </div>
                                             </div>
                                             {editing && (
@@ -271,8 +397,6 @@ export default function WarehouseProducts() {
                                             <div className="col-12">
                                                 <div className="form-group">
                                                     <label>Ảnh sản phẩm</label>
-
-                                                    {/* Preview box */}
                                                     <div className="mb-2 text-center" style={{ background: '#f8f9fa', border: '1px dashed #ced4da', borderRadius: 6, padding: 10, minHeight: 110 }}>
                                                         {(imgPreview || form.imageUrl) ? (
                                                             <img
@@ -288,8 +412,6 @@ export default function WarehouseProducts() {
                                                             </div>
                                                         )}
                                                     </div>
-
-                                                    {/* Mode toggle */}
                                                     <div className="btn-group btn-group-sm w-100 mb-2" role="group">
                                                         <button type="button"
                                                             className={`btn ${imgMode === 'url' ? 'btn-secondary' : 'btn-outline-secondary'}`}
@@ -302,7 +424,6 @@ export default function WarehouseProducts() {
                                                             <i className="fas fa-upload mr-1"></i>Tải lên từ máy
                                                         </button>
                                                     </div>
-
                                                     {imgMode === 'url' && (
                                                         <input
                                                             className="form-control form-control-sm"

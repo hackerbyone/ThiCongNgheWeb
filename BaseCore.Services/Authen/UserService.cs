@@ -45,6 +45,12 @@ namespace BaseCore.Services.Authen
             // Debug info: log user's active status and salt/hash presence (no password in logs)
             Console.WriteLine($"Authenticate: found user='{user.UserName}', IsActive={user.IsActive}, SaltPresent={(user.Salt != null && user.Salt.Length>0)}, PasswordLength={(user.Password==null?0:user.Password.Length)}");
 
+            if (!user.IsActive)
+            {
+                Console.WriteLine($"Authenticate: inactive user blocked for username '{username}'");
+                return null;
+            }
+
             // verify password using hash or plain text
             bool isValidPassword = false;
 

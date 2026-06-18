@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { formatVND } from '../utils/format'
 
 export default function OrderSuccess() {
   const { state } = useLocation()
@@ -15,6 +16,32 @@ export default function OrderSuccess() {
         <p className="text-gray-700 mb-6">
           Mã đơn hàng: <b className="text-primary-700">#{order.id}</b>
         </p>
+      )}
+      {order?.id && (
+        <div className="text-gray-700 mb-6 space-y-1">
+          {typeof order.totalAmount === 'number' && (
+            <p className="text-sm">
+              Tổng thanh toán: <b className="text-primary-700">{formatVND(order.totalAmount)}</b>
+            </p>
+          )}
+          {typeof order.shippingFee === 'number' && (
+            <p className="text-sm text-gray-500">Phí vận chuyển: {formatVND(order.shippingFee)}</p>
+          )}
+          {order.paymentMethod && (
+            <p className="text-sm text-gray-500">
+              Thanh toán: {order.paymentMethod === 'BankTransfer' ? 'Chuyển khoản' : 'COD'}
+            </p>
+          )}
+        </div>
+      )}
+      {order?.paymentMethod === 'BankTransfer' && order?.id && (
+        <Link
+          to={`/payment/${order.id}`}
+          state={{ order }}
+          className="inline-block bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded font-medium mb-5"
+        >
+          Xem thông tin chuyển khoản
+        </Link>
       )}
       <p className="text-sm text-gray-500 mb-6">
         Chúng tôi sẽ liên hệ với bạn sớm nhất để xác nhận đơn hàng.

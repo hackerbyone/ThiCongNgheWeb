@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using BaseCore.Entities;
 using BaseCore.Repository.EFCore;
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace BaseCore.APIService.Controllers
 {
@@ -64,17 +65,21 @@ namespace BaseCore.APIService.Controllers
         /// Create new category
         /// </summary>
         [HttpPost]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Create([FromBody] CategoryDto dto)
         {
-            var existing = await _categoryRepository.GetByNameAsync(dto.Name);
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                return BadRequest(new { message = "Tên danh mục không được để trống" });
+
+            var name = dto.Name.Trim();
+            var existing = await _categoryRepository.GetByNameAsync(name);
             if (existing != null)
                 return BadRequest(new { message = "Category name already exists" });
 
             var category = new Category
             {
-                Name = dto.Name,
-                Description = dto.Description ?? ""
+                Name = name,
+                Description = dto.Description?.Trim() ?? ""
             };
 
             await _categoryRepository.AddAsync(category);
@@ -85,15 +90,23 @@ namespace BaseCore.APIService.Controllers
         /// Update category
         /// </summary>
         [HttpPut("{id}")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Update(int id, [FromBody] CategoryDto dto)
         {
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null)
                 return NotFound(new { message = "Category not found" });
 
-            category.Name = dto.Name ?? category.Name;
-            category.Description = dto.Description ?? category.Description;
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                return BadRequest(new { message = "Tên danh mục không được để trống" });
+
+            var name = dto.Name.Trim();
+            var existing = await _categoryRepository.GetByNameAsync(name);
+            if (existing != null && existing.Id != id)
+                return BadRequest(new { message = "Category name already exists" });
+
+            category.Name = name;
+            category.Description = dto.Description?.Trim() ?? "";
 
             await _categoryRepository.UpdateAsync(category);
             return Ok(category);
@@ -103,7 +116,7 @@ namespace BaseCore.APIService.Controllers
         /// Delete category
         /// </summary>
         [HttpDelete("{id}")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Delete(int id)
         {
             var category = await _categoryRepository.GetByIdAsync(id);
@@ -128,7 +141,10 @@ namespace BaseCore.APIService.Controllers
 
     public class CategoryDto
     {
+        [Required(ErrorMessage = "Tên danh mục không được để trống")]
+        [StringLength(100, MinimumLength = 1, ErrorMessage = "Tên danh mục tối đa 100 ký tự")]
         public string Name { get; set; } = "";
+        [StringLength(500, ErrorMessage = "Mô tả tối đa 500 ký tự")]
         public string? Description { get; set; }
     }
 }

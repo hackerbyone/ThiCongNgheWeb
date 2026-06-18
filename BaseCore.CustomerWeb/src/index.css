@@ -42,3 +42,72 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Dual range slider bộ lọc giá */
+.range-slider {
+  position: relative;
+  height: 20px;
+  margin: 10px 0 4px;
+}
+.range-slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.range-slider-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #1e6bbf;
+  border-radius: 2px;
+}
+.range-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #1e6bbf;
+  cursor: grab;
+  pointer-events: all;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition: transform 0.1s, border-color 0.15s;
+}
+.range-input::-webkit-slider-thumb:hover {
+  border-color: #143f86;
+  transform: scale(1.18);
+}
+.range-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+.range-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #1e6bbf;
+  cursor: grab;
+  pointer-events: all;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}

@@ -61,6 +61,8 @@ export default function Cart() {
                       >−</button>
                       <input
                         type="number"
+                        min="1"
+                        max={it.stock || undefined}
                         value={it.quantity}
                         onChange={(e) => updateQuantity(it.id, Math.max(1, +e.target.value || 1))}
                         className="w-12 text-center outline-none"

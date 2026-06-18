@@ -27,6 +27,134 @@ const exportCSV = (rows, filename) => {
     URL.revokeObjectURL(url);
 };
 
+const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const downloadBlob = (content, filename, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+const exportWarehouseReportDoc = (report, startDate, endDate, filename) => {
+    if (!report) return;
+    const summary = report.summary || {};
+    const details = report.details || [];
+    const period = `${startDate || 'Tất cả'} đến ${endDate || 'Tất cả'}`;
+    const exportDate = new Date().toLocaleString('vi-VN');
+    const detailRows = details.length
+        ? details.map((d, index) => `
+            <tr>
+                <td class="center">${index + 1}</td>
+                <td class="product">${escapeHtml(d.productName)}</td>
+                <td>${escapeHtml(d.categoryName)}</td>
+                <td class="center">${fmt(d.currentStock)}</td>
+                <td class="center">${fmt(d.quantityReceived)}</td>
+                <td class="money">${fmtCur(d.totalCostReceived)}</td>
+                <td class="center">${fmt(d.quantitySold)}</td>
+                <td class="money">${fmtCur(d.revenue)}</td>
+                <td class="center danger">${fmt(d.quantityDamaged)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="9" class="empty">Không có dữ liệu trong khoảng thời gian này</td></tr>';
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Báo cáo kho hàng</title>
+    <style>
+        @page { size: A4 landscape; margin: 1.2cm; }
+        body { font-family: Arial, sans-serif; color: #1f2937; font-size: 11pt; }
+        .header { border-bottom: 3px solid #1f4e79; padding-bottom: 10px; margin-bottom: 16px; }
+        .company { color: #64748b; font-size: 10pt; text-transform: uppercase; letter-spacing: 1px; }
+        h1 { color: #1f4e79; font-size: 22pt; margin: 4px 0; text-align: center; }
+        h2 { color: #1f4e79; font-size: 14pt; margin: 16px 0 8px; }
+        .meta { text-align: center; color: #475569; margin-bottom: 14px; }
+        .summary { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 12px 0 18px; }
+        .summary td { background: #eef6ff; border: 1px solid #bfdbfe; padding: 10px; text-align: center; }
+        .summary .label { color: #475569; font-size: 9pt; text-transform: uppercase; }
+        .summary .value { font-weight: 700; color: #0f172a; font-size: 13pt; margin-top: 4px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .detail th { background: #1f4e79; color: #fff; padding: 7px 5px; border: 1px solid #1e3a5f; font-size: 9.5pt; }
+        .detail td { padding: 6px 5px; border: 1px solid #cbd5e1; vertical-align: top; }
+        .detail tr:nth-child(even) td { background: #f8fafc; }
+        .center { text-align: center; }
+        .money { text-align: right; white-space: nowrap; }
+        .product { font-weight: 600; }
+        .total td { background: #e0f2fe !important; font-weight: 700; }
+        .danger { color: #b91c1c; font-weight: 700; }
+        .empty { text-align: center; color: #64748b; font-style: italic; padding: 18px; }
+        .note { margin-top: 14px; color: #64748b; font-size: 9pt; }
+        .signatures { width: 100%; margin-top: 36px; border-collapse: collapse; }
+        .signatures td { width: 50%; text-align: center; border: none; padding-top: 8px; }
+        .sign-title { font-weight: 700; }
+        .sign-space { height: 56px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company">Văn phòng phẩm Online</div>
+        <h1>BÁO CÁO KHO HÀNG</h1>
+        <div class="meta">Kỳ báo cáo: <b>${escapeHtml(period)}</b> &nbsp; | &nbsp; Ngày xuất: ${escapeHtml(exportDate)}</div>
+    </div>
+    <table class="summary">
+        <tr>
+            <td><div class="label">Tổng nhập</div><div class="value">${fmt(summary.totalReceived)}</div></td>
+            <td><div class="label">Tổng bán</div><div class="value">${fmt(summary.totalSold)}</div></td>
+            <td><div class="label">Hư hỏng</div><div class="value">${fmt(summary.totalDamaged)}</div></td>
+            <td><div class="label">Doanh thu</div><div class="value">${fmtCur(summary.totalRevenue)}</div></td>
+            <td><div class="label">Chi phí nhập</div><div class="value">${fmtCur(summary.totalCost)}</div></td>
+        </tr>
+    </table>
+    <h2>Chi tiết theo sản phẩm</h2>
+    <table class="detail">
+        <thead>
+            <tr>
+                <th>STT</th>
+                <th>Sản phẩm</th>
+                <th>Danh mục</th>
+                <th>Tồn hiện tại</th>
+                <th>SL nhập</th>
+                <th>Chi phí nhập</th>
+                <th>SL bán</th>
+                <th>Doanh thu</th>
+                <th>SL hư</th>
+            </tr>
+        </thead>
+        <tbody>${detailRows}</tbody>
+        <tfoot>
+            <tr class="total">
+                <td colspan="4">Tổng cộng</td>
+                <td class="center">${fmt(summary.totalReceived)}</td>
+                <td class="money">${fmtCur(summary.totalCost)}</td>
+                <td class="center">${fmt(summary.totalSold)}</td>
+                <td class="money">${fmtCur(summary.totalRevenue)}</td>
+                <td class="center danger">${fmt(summary.totalDamaged)}</td>
+            </tr>
+        </tfoot>
+    </table>
+    <div class="note">Ghi chú: Báo cáo được xuất từ hệ thống quản lý kho Văn phòng phẩm Online.</div>
+    <table class="signatures">
+        <tr>
+            <td><div class="sign-title">Người lập báo cáo</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+            <td><div class="sign-title">Quản lý kho</div><div class="sign-space"></div><div>(Ký, ghi rõ họ tên)</div></td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+    downloadBlob('\ufeff' + html, filename, 'application/msword;charset=utf-8');
+};
+
 export default function Warehouse() {
     const { isAdmin } = useAuth();
     const [activeTab, setActiveTab] = useState('inventory');
@@ -208,6 +336,10 @@ export default function Warehouse() {
             ])
         ];
         exportCSV(rows, `bao-cao-kho-${rptStart}-${rptEnd}.csv`);
+    };
+
+    const exportReportDoc = () => {
+        exportWarehouseReportDoc(report, rptStart, rptEnd, `bao-cao-kho-${rptStart}-${rptEnd}.doc`);
     };
 
     const exportInventory = () => {
@@ -521,6 +653,9 @@ export default function Warehouse() {
                                         <div className="col-md-6 text-right">
                                             <button className="btn btn-success btn-sm" onClick={exportReport} disabled={!report}>
                                                 <i className="fas fa-file-csv mr-1"></i>Xuất CSV
+                                            </button>
+                                            <button className="btn btn-primary btn-sm ml-2" onClick={exportReportDoc} disabled={!report}>
+                                                <i className="fas fa-file-word mr-1"></i>Xuất DOC
                                             </button>
                                         </div>
                                     </div>

@@ -33,9 +33,9 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-4 py-1.5 flex justify-between">
           <span>Hotline: 0827027392 - Mở cửa 8:00 - 22:00</span>
           <div className="space-x-4 hidden sm:flex">
-            <Link to="/orders" className="hover:underline">Tra cứu đơn hàng</Link>
+            <Link to="/orders" className="text-white hover:underline">Tra cứu đơn hàng</Link>
             <span>|</span>
-            <Link to="/about" className="hover:underline">Về chúng tôi</Link>
+            <Link to="/about" className="text-white hover:underline">Về chúng tôi</Link>
           </div>
         </div>
       </div>
@@ -120,10 +120,9 @@ export default function Header() {
               </div>
             )}
           </div>
-          <Link to="/" className="px-4 py-2.5 hover:bg-primary-600">Trang chủ</Link>
-          <Link to="/products" className="px-4 py-2.5 hover:bg-primary-600">Tất cả sản phẩm</Link>
-          <Link to="/products?discount=1" className="px-4 py-2.5 hover:bg-primary-600">Khuyến mãi 🔥</Link>
-          <Link to="/contact" className="px-4 py-2.5 hover:bg-primary-600">Liên hệ</Link>
+          <Link to="/" className="px-4 py-2.5 hover:bg-primary-600 text-white ">Trang chủ</Link>
+          <Link to="/products" className="px-4 py-2.5 hover:bg-primary-600 text-white">Tất cả sản phẩm</Link>
+          <Link to="/contact" className="px-4 py-2.5 hover:bg-primary-600 text-white ">Liên hệ</Link>
         </div>
       </nav>
     </header>

@@ -183,7 +183,18 @@ namespace BaseCore.APIService.Controllers
                 if (order == null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
 
                 // GetByOrderAsync đã Include Product → không cần query thêm cho từng item
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var isAdmin = User.IsInRole("Admin");
+                Guid.TryParse(userId, out var userGuid);
+                if (!isAdmin && (userGuid == Guid.Empty || order.UserId != userGuid))
+                    return Forbid();
+
                 var details = await _orderDetailRepository.GetByOrderAsync(id);
+                var reviewedProductIds = await _db.ProductReviews
+                    .Where(r => r.OrderId == id && r.UserId == order.UserId)
+                    .Select(r => r.ProductId)
+                    .ToListAsync();
+
                 var detailsWithProduct = details.Select(d => new
                 {
                     d.Id,
@@ -192,7 +203,8 @@ namespace BaseCore.APIService.Controllers
                     productName  = d.Product?.Name ?? "Sản phẩm đã xóa",
                     productImage = d.Product?.ImageUrl ?? "",
                     d.Quantity,
-                    d.UnitPrice
+                    d.UnitPrice,
+                    reviewed = reviewedProductIds.Contains(d.ProductId)
                 }).ToList();
 
                 return Ok(new { order, details = detailsWithProduct });
@@ -221,7 +233,7 @@ namespace BaseCore.APIService.Controllers
             if (dto.Items.GroupBy(i => i.ProductId).Any(g => g.Count() > 1))
                 return BadRequest(new { message = "Không thể thêm cùng 1 sản phẩm 2 lần trong đơn hàng" });
 
-            decimal totalAmount = 0;
+            decimal productTotal = 0;
             var orderDetails = new List<OrderDetail>();
 
             foreach (var item in dto.Items)
@@ -237,7 +249,7 @@ namespace BaseCore.APIService.Controllers
                     ? product.Price * (1 - product.DiscountPercent / 100)
                     : product.Price;
 
-                totalAmount += effectivePrice * item.Quantity;
+                productTotal += effectivePrice * item.Quantity;
                 orderDetails.Add(new OrderDetail
                 {
                     ProductId = item.ProductId,
@@ -246,11 +258,19 @@ namespace BaseCore.APIService.Controllers
                 });
             }
 
+            var shippingFee = productTotal >= 300000m ? 0m : 30000m;
+            var paymentMethod = string.IsNullOrWhiteSpace(dto.PaymentMethod) ? "COD" : dto.PaymentMethod.Trim();
+            var allowedPaymentMethods = new[] { "COD", "BankTransfer" };
+            if (!allowedPaymentMethods.Contains(paymentMethod))
+                return BadRequest(new { message = "Phuong thuc thanh toan khong hop le" });
+
             var order = new Order
             {
                 UserId          = userGuid,
                 OrderDate       = DateTime.Now,
-                TotalAmount     = totalAmount,
+                TotalAmount     = productTotal + shippingFee,
+                ShippingFee     = shippingFee,
+                PaymentMethod   = paymentMethod,
                 Status          = "Pending",
                 ShippingAddress = dto.ShippingAddress ?? ""
             };
@@ -271,6 +291,8 @@ namespace BaseCore.APIService.Controllers
                     userId          = order.UserId,
                     orderDate       = order.OrderDate,
                     totalAmount     = order.TotalAmount,
+                    shippingFee     = order.ShippingFee,
+                    paymentMethod   = order.PaymentMethod,
                     status          = order.Status,
                     shippingAddress = order.ShippingAddress
                 },
@@ -356,18 +378,41 @@ namespace BaseCore.APIService.Controllers
             var order = await _orderRepository.GetByIdAsync(id);
             if (order == null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
 
-            var validTransitions = new Dictionary<string, string>
+            var validTransitions = new Dictionary<string, string[]>
             {
-                { "Processing", "Completed" }
+                { "Processing", new[] { "Processing" } }
             };
 
-            if (!validTransitions.TryGetValue(order.Status, out var allowed) || allowed != dto.Status)
+            if (!validTransitions.TryGetValue(order.Status, out var allowed) || !allowed.Contains(dto.Status))
                 return BadRequest(new { message = $"Không thể chuyển trạng thái từ '{order.Status}' sang '{dto.Status}'" });
 
             order.Status = dto.Status;
             await _orderRepository.UpdateAsync(order);
 
             return Ok(order);
+        }
+
+        // PUT /api/orders/{id}/received - Khach hang xac nhan da nhan hang.
+        [HttpPut("{id}/received")]
+        public async Task<IActionResult> MarkReceived(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var userGuid))
+                return Unauthorized();
+
+            var order = await _orderRepository.GetByIdAsync(id);
+            if (order == null) return NotFound(new { message = "Không tìm thấy đơn hàng" });
+
+            if (order.UserId != userGuid)
+                return Forbid();
+
+            if (order.Status != "Processing")
+                return BadRequest(new { message = "Chỉ có thể xác nhận đã nhận hàng khi đơn đang vận chuyển" });
+
+            order.Status = "Completed";
+            await _orderRepository.UpdateAsync(order);
+
+            return Ok(new { message = "Đã xác nhận nhận hàng. Bạn có thể đánh giá sản phẩm.", order });
         }
 
         // PUT /api/orders/{id}/cancel — hủy đơn (chỉ hoàn kho nếu đã duyệt)
@@ -413,6 +458,7 @@ namespace BaseCore.APIService.Controllers
     {
         public List<OrderItemDto> Items { get; set; } = new();
         public string? ShippingAddress { get; set; }
+        public string? PaymentMethod { get; set; }
     }
 
     public class OrderItemDto

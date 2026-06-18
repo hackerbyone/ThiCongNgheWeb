@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using BaseCore.Entities;
 using BaseCore.Repository.EFCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace BaseCore.APIService.Controllers
 {
@@ -58,7 +59,7 @@ namespace BaseCore.APIService.Controllers
         }
 
         [HttpPost]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Create([FromBody] ManufacturerDto dto)
         {
             if (string.IsNullOrWhiteSpace(dto.Name))
@@ -81,15 +82,22 @@ namespace BaseCore.APIService.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Update(int id, [FromBody] ManufacturerDto dto)
         {
             var manufacturer = await _manufacturerRepository.GetByIdAsync(id);
             if (manufacturer == null)
                 return NotFound(new { message = "Không tìm thấy nhà sản xuất" });
 
-            if (!string.IsNullOrWhiteSpace(dto.Name))
-                manufacturer.Name = dto.Name.Trim();
+            if (string.IsNullOrWhiteSpace(dto.Name))
+                return BadRequest(new { message = "Ten nha san xuat khong duoc de trong" });
+
+            var name = dto.Name.Trim();
+            var existing = await _manufacturerRepository.GetByNameAsync(name);
+            if (existing != null && existing.Id != id)
+                return BadRequest(new { message = "Ten nha san xuat da ton tai" });
+
+            manufacturer.Name = name;
 
             manufacturer.Description = dto.Description?.Trim() ?? manufacturer.Description;
             manufacturer.Website = dto.Website?.Trim() ?? manufacturer.Website;
@@ -100,7 +108,7 @@ namespace BaseCore.APIService.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize]
+        [Authorize(Roles = "Admin,Warehouse")]
         public async Task<IActionResult> Delete(int id)
         {
             var manufacturer = await _manufacturerRepository.GetByIdAsync(id);
@@ -118,9 +126,14 @@ namespace BaseCore.APIService.Controllers
 
     public class ManufacturerDto
     {
+        [Required(ErrorMessage = "Ten nha san xuat khong duoc de trong")]
+        [StringLength(200, MinimumLength = 1, ErrorMessage = "Ten nha san xuat toi da 200 ky tu")]
         public string Name { get; set; } = "";
+        [StringLength(500, ErrorMessage = "Mo ta toi da 500 ky tu")]
         public string? Description { get; set; }
+        [StringLength(200, ErrorMessage = "Website toi da 200 ky tu")]
         public string? Website { get; set; }
+        [StringLength(20, ErrorMessage = "So dien thoai toi da 20 ky tu")]
         public string? Phone { get; set; }
     }
 }

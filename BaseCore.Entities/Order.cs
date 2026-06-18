@@ -14,6 +14,10 @@ namespace BaseCore.Entities
 
         public decimal TotalAmount { get; set; }
 
+        public decimal ShippingFee { get; set; }
+
+        public string PaymentMethod { get; set; } = "COD";
+
         // Pending → Processing (approved) → Completed | Cancelled | Rejected
         public string Status { get; set; }
 

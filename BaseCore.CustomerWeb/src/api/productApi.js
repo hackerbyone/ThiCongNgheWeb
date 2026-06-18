@@ -29,6 +29,12 @@ const productApi = {
   updateDiscount(id, discountPercent) {
     return axiosClient.put(`/products/${id}/discount`, { discountPercent })
   },
+  getReviews(id) {
+    return axiosClient.get(`/products/${id}/reviews`)
+  },
+  createReview(id, payload) {
+    return axiosClient.post(`/products/${id}/reviews`, payload)
+  },
 }
 
 export default productApi

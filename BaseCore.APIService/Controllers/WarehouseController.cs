@@ -308,31 +308,46 @@ namespace BaseCore.APIService.Controllers
         [HttpPost("products")]
         public async Task<IActionResult> CreateProduct([FromBody] WarehouseProductDto dto)
         {
-            if (string.IsNullOrEmpty(dto.Name))
+            if (string.IsNullOrWhiteSpace(dto.Name))
                 return BadRequest(new { message = "Tên sản phẩm không được để trống" });
             if (dto.Price <= 0)
                 return BadRequest(new { message = "Giá sản phẩm phải lớn hơn 0" });
             if (dto.Stock < 0)
                 return BadRequest(new { message = "Tồn kho không được âm" });
+            if (dto.DiscountPercent < 0 || dto.DiscountPercent > 99)
+                return BadRequest(new { message = "Giảm giá phải từ 0 đến 99%" });
+
+            var categoryExists = await _db.Categories.AnyAsync(c => c.Id == dto.CategoryId);
+            if (!categoryExists)
+                return BadRequest(new { message = "Danh mục sản phẩm không tồn tại" });
+
+            if (dto.ManufacturerId.HasValue && dto.ManufacturerId.Value > 0)
+            {
+                var manufacturerExists = await _db.Manufacturers.AnyAsync(m => m.Id == dto.ManufacturerId.Value);
+                if (!manufacturerExists)
+                    return BadRequest(new { message = "Nhà sản xuất không tồn tại" });
+            }
 
             var product = new Product
             {
-                Name           = dto.Name,
+                Name           = dto.Name.Trim(),
                 Price          = dto.Price,
                 Stock          = dto.Stock,
                 CategoryId     = dto.CategoryId,
-                ManufacturerId = dto.ManufacturerId,
+                ManufacturerId = dto.ManufacturerId.HasValue && dto.ManufacturerId.Value > 0 ? dto.ManufacturerId : null,
                 Description    = dto.Description ?? "",
                 ImageUrl       = dto.ImageUrl ?? "",
                 DiscountPercent = dto.DiscountPercent
             };
             _db.Products.Add(product);
+            await _db.SaveChangesAsync();
 
             if (dto.Stock > 0)
+            {
                 AddLog(product.Id, "Tạo sản phẩm", dto.Stock, 0, dto.Stock, null,
                     $"Tạo sản phẩm mới với tồn kho ban đầu: {dto.Stock}");
-
-            await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync();
+            }
 
             return Ok(new { message = "Tạo sản phẩm thành công", id = product.Id });
         }
@@ -482,6 +497,6 @@ namespace BaseCore.APIService.Controllers
         public string Description { get; set; }
         public string ImageUrl { get; set; }
         public decimal DiscountPercent { get; set; }
-        public string StockNote { get; set; }
+        public string? StockNote { get; set; }
     }
 }

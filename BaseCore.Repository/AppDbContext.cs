@@ -30,6 +30,7 @@ namespace BaseCore.Repository
         public DbSet<Manufacturer> Manufacturers { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderDetail> OrderDetails { get; set; }
+        public DbSet<ProductReview> ProductReviews { get; set; }
 
         // Warehouse
         public DbSet<WarehouseReceipt> WarehouseReceipts { get; set; }
@@ -112,6 +113,8 @@ namespace BaseCore.Repository
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ShippingFee).HasPrecision(18, 2).HasDefaultValue(0);
+                entity.Property(e => e.PaymentMethod).HasMaxLength(50).HasDefaultValue("COD");
                 entity.Property(e => e.ShippingAddress).HasMaxLength(500);
                 entity.Property(e => e.CancelReason).HasMaxLength(500).IsRequired(false);
             });
@@ -132,6 +135,24 @@ namespace BaseCore.Repository
                       .WithMany()
                       .HasForeignKey(e => e.ProductId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ProductReview>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Comment).HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
+                entity.HasIndex(e => new { e.OrderId, e.ProductId, e.UserId }).IsUnique();
+
+                entity.HasOne(e => e.Product)
+                      .WithMany()
+                      .HasForeignKey(e => e.ProductId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Order)
+                      .WithMany()
+                      .HasForeignKey(e => e.OrderId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configure WarehouseReceipt entity
